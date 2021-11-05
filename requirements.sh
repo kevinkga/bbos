@@ -1,1 +1,1 @@
-apt install growpart
+sudo apt install cloud-guest-utils
