@@ -23,7 +23,7 @@ build-job:       # This job runs in the build stage, which runs first.
   stage: build
   script:
     - apt-get update
-    - apt-get install gawk util-linux realpath qemu-user-static p7zip-full git
+    - apt-get install gawk util-linux qemu-user-static p7zip-full git
     - git clone https://github.com/guysoft/CustomPiOS.git
     - cd CustomPiOS/src
     - ./make_custom_pi_os -g distro
