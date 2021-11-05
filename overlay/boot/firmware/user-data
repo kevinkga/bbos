@@ -40,16 +40,16 @@ ssh_pwauth: true
 #- robotics: [robot]
 #- pi
 #
-#users:
-#- default
-#- name: kaubeela
-#  gecos: Kevin Aubeelack
-#  primary_group: kaubeela
+users:
+- default
+- name: kaubeela
+  gecos: Kevin Aubeelack
+  primary_group: kaubeela
   groups:
-    - dialout
-    - sudo
-    - video
-    - www-data
+  - dialout
+  - sudo
+  - video
+  - www-data
   ssh_import_id: kaubeela
 #  lock_passwd: false
 #  passwd: $5$hkui88$nvZgIle31cNpryjRfO9uArF7DYiBcWEnjqq7L1AQNN3
