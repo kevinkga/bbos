@@ -27,7 +27,7 @@ build-job:       # This job runs in the build stage, which runs first.
     - git clone https://github.com/guysoft/CustomPiOS.git
     - cd CustomPiOS/src
     - ./make_custom_pi_os -g distro
-    - cd distro
-    - sudo modprobe loop
-    - sudo bash -x ./build_dist
+    - cd distro/src
+    - modprobe loop
+    - bash -x ./build_dist
 
