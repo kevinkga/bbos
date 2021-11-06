@@ -1,10 +1,9 @@
 export DEBIAN_FRONTEND=noninteractive
-cd /root
+cd /root/chroot
 df -h
 dhclient
 apt -yq update && apt install -yq ansible
 
-git clone https://github.com/kevinkga/klipper-ubuntu.git
 cd klipper-ubuntu
 ansible-playbook --connection=local playbook.yml
 

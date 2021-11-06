@@ -34,6 +34,15 @@ This tells the tool to *make a larger copy* of the image in the current path. Th
 
 # Customisations
 There are two types of customisations that are implemented by this utility:
+## Scripts
+The entire `chroot` folder gets copied across to `/root/chroot` on the target system and `install.sh` gets called once the utility chroots into the system. 
+
+Here you can modify what files you want to have made available and the entry point `install.sh` that will execute within the image building process. It is as simple as that.
+
+For more complex deployments, I would recommend using more advanced tools like Ansible to provision the system. 
+
+In fact, you can look at the default content of `install.sh` where it clones a git repo of an Ansible Playbook and executes it locally.
+
 ## File overlay
 These are files that you want to add or replace into the base image. These are stored in the `overlay` folder. Typically, your base image will have two main partitions:
 - `system-boot`: This is where you will find the boot files e.g. the kernel and the initial ramdisk. It also contains the `firmware` folder which itself contains a few interesting files like:
@@ -42,10 +51,6 @@ These are files that you want to add or replace into the base image. These are s
     - `user-data`: The Ubuntu cloud-init file
 - `writable`: This is the root fs of the distribution and typically maps to `/` in the installation. You can also put in overrides for settings files etc in here. 
     - `bbos.txt`: This is a placeholder file
-## Scripts
-Under the `chroot` folder you will find an `install.sh` script that you can modify and that will execute within the image building process. It is as simple as that. 
-
-For more complex deployments, I would recommend using more advanced tools like Ansible to provision the system. In fact, you can look at the default content of `install.sh` where it clones a git repo of an Ansible Playbook and executes it locally. 
 
 # Build the image
 Building the image itself is simple. Just issue the following command: `./createImage.sh <your base image>`
