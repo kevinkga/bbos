@@ -1,14 +1,15 @@
 # BBOS
 
-Tools for building the Bumblebee OS for 3D Printers on Raspberry Pis.
+Tools for building the Bumblebee 3D Printer OS for on Raspberry Pis.
 
 # Installation
 
-Run the requirement.sh script to install common dependencies for these scripts to work.
+Run the `requirements.sh` script to install common dependencies for these scripts to work.
 
 # Download a base image.
 
-This project has been tested with Ubuntu Server images so far. There are no guarantees that this will work with other images. 
+Disclaimer: This project has been tested with Ubuntu Server images so far. There are no guarantees that this will work with other images. 
+
 Firstly to get started we will need a base image to build upon.
 
 For example, fetch a base Ubuntu Server image from here https://ubuntu.com/download/raspberry-pi and save the image in your Downloads folder (e.g `ubuntu-21.10-preinstalled-server-armhf+raspi.img.xz`).
@@ -19,14 +20,12 @@ cd ~/Downloads/
 unxz ubuntu-21.10-preinstalled-server-armhf+raspi.img
 ```
 
-`sudo dd bs=4M if=enlarged-ubuntu-21.10-preinstalled-server-armhf+raspi.img  of=/dev/sdb conv=fsync`
-
 # (optional) Resizing the base image
 
 The typical server images of Ubuntu are small, around 3.5GB. Thus, if you intend to add a lot of data to this image it will need to be resized. 
 This is where the `resizeImg.sh` tool comes in. 
 
-For example, if you need 5GB more space for your customizations, you can issue the following command:
+For example, if you need 5GB more space for your customisations, you can issue the following command:
 
 `./resizeImg.sh ~/Downloads/ubuntu-21.10-preinstalled-server-armhf+raspi.img 4000`
 
@@ -41,7 +40,7 @@ Here you can modify what files you want to have made available and the entry poi
 
 For more complex deployments, I would recommend using more advanced tools like Ansible to provision the system. 
 
-In fact, you can look at the default content of `install.sh` where it clones a git repo of an Ansible Playbook and executes it locally.
+In fact, you can look at the default content of `install.sh` it clones a git repo of an Ansible Playbook and executes it locally.
 
 ## File overlay
 These are files that you want to add or replace into the base image. These are stored in the `overlay` folder. Typically, your base image will have two main partitions:
