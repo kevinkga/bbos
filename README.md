@@ -61,14 +61,7 @@ There are many tools that will write images to disk. However, a simple method is
 `sudo dd bs=4M if=enlarged-ubuntu-21.10-preinstalled-server-armhf+raspi.img  of=/dev/sdX conv=fsync`
 
 # Summary
-As an example, as root:
+In the, once you've understood the tools and the concepts around them, you can simplify the entire process of building images using the `deploy.sh` utility instead. This assumes that your customisations are in place and that you only want to build and deploy an image to a disk device.
 ```
-rm enlarged-ubuntu-21.10-preinstalled-server-armhf+raspi.img
-./resizeImg.sh /home/kaubeelack/Downloads/ubuntu-21.10-preinstalled-server-armhf+raspi.img 4000 
-./createImage.sh enlarged-ubuntu-21.10-preinstalled-server-armhf+raspi.img 
-umount /dev/sdb1;
-umount /dev/sdb2;
-dd bs=4M if=enlarged-ubuntu-21.10-preinstalled-server-armhf+raspi.img of=/dev/sdb conv=fsync
-umount /dev/sdb2; fsck.ext4 -vfy /dev/sdb2
-umount /dev/sdb1; dosfsck -w -r -l -a -v -t /dev/sdb1
+sudo ./deploy.sh /dev/sdb
 ```
