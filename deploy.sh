@@ -1,0 +1,43 @@
+TARGET_DEVICE=$1
+ORIGINAL_BASE_PATH=$PWD
+BOOT_PART_DEVICE=${TARGET_DEVICE}1
+ROOT_PART_DEVICE=${TARGET_DEVICE}2
+
+IMAGE_NAME=ubuntu-21.10-preinstalled-server-armhf+raspi.img
+IMAGE_COMPRESSED_NAME=${IMAGE_NAME}.xz
+
+REMOTE_IMAGE_HOST=https://cdimage.ubuntu.com/releases/21.10/release
+REMOTE_IMAGE_TARGET=${REMOTE_IMAGE_HOST}/${IMAGE_COMPRESSED_NAME}
+
+CACHE_PATH=cache
+CACHED_ORIGINAL_IMAGES=${CACHE_PATH}/ORIGINAL_IMAGES
+CACHED_ENLARGED_IMAGES=${CACHE_PATH}/ENLARGED_IMAGES
+
+BASE_IMAGE=${CACHED_ORIGINAL_IMAGES}/${IMAGE_NAME}
+ENLARGED_IMAGE=${CACHED_ENLARGED_IMAGES}/enlarged-${IMAGE_NAME}
+
+mkdir -p ${CACHED_ORIGINAL_IMAGES}
+mkdir -p ${CACHED_ENLARGED_IMAGES}
+
+rm cache/ENLARGED_IMAGES/enlarged-ubuntu-21.10-preinstalled-server-armhf+raspi.img
+if test -f "$BASE_IMAGE"; then
+  echo "Using ${BASE_IMAGE} as base image"
+else
+  echo "${BASE_IMAGE} not found. Downloading it from ${REMOTE_IMAGE_TARGET} into ${CACHED_ORIGINAL_IMAGES}"
+  cd ${CACHED_ORIGINAL_IMAGES}
+  wget ${REMOTE_IMAGE_TARGET}
+  unxz ${IMAGE_COMPRESSED_NAME}
+  cd ${ORIGINAL_BASE_PATH}
+fi
+
+./resizeImg.sh ${BASE_IMAGE} 4000 ${ENLARGED_IMAGE}
+./createImage.sh ${ENLARGED_IMAGE}
+
+#burn image
+umount ${BOOT_PART_DEVICE};
+umount ${ROOT_PART_DEVICE};
+dd bs=4M if=${ENLARGED_IMAGE} of=${TARGET_DEVICE} conv=fsync
+
+#check burnt image
+umount ${ROOT_PART_DEVICE}; fsck.ext4 -vfy ${ROOT_PART_DEVICE}
+umount ${BOOT_PART_DEVICE}; dosfsck -w -r -l -a -v -t ${BOOT_PART_DEVICE}
