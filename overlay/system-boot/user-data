@@ -29,7 +29,7 @@ ssh_pwauth: true
 
 ## On first boot, use ssh-import-id to give the specific users SSH access to
 ## the default user
-#ssh_import_id:
+ssh_import_id:
 - lp:kaubeela
 #- gh:my_github_username
 
