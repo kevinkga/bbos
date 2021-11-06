@@ -40,3 +40,4 @@ sudo umount -l /mnt/ubuntu/{dev/pts,dev,sys,proc,boot,}
 sudo losetup -d ${LOOP_DEVICE}
 # qemu-system-arm -kernel system-boot/vmlinuz  -cpu arm1176 -m 256 -M versatilepb -dtb system-boot/bcm2835-rpi-zero-w.dtb -no-reboot -serial stdio -append 'root=/dev/sda2 panic=1 rootfstype=ext4 rw' -hda ~/Documents/ubuntu-21.10-preinstalled-server-armhf+raspi.img
 sudo cp -ar overlay/system-boot/* /mnt/ubuntu/boot/
+sudo cp -ar overlay/writable/* /mnt/ubuntu/
