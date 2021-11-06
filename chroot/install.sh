@@ -10,6 +10,7 @@ apt -yq purge
 cd klipper-ubuntu
 ansible-playbook --connection=local playbook.yml
 
+apt remove -yq ansible
 df -h
 apt -yq autoclean
 apt -yq autoremove
