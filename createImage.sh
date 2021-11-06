@@ -3,7 +3,7 @@
 SOURCE_IMG=$1
 LOOP_DEVICE=$(sudo losetup -f)
 
-set -e
+#set -e
 
 echo Using loop device ${LOOP_DEVICE}
 sudo losetup -P ${LOOP_DEVICE} ${SOURCE_IMG}
