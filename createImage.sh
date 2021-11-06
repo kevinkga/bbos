@@ -29,18 +29,17 @@ sudo cp /usr/bin/qemu-arm-static /mnt/ubuntu/usr/bin/
 sudo cp -ar chroot /mnt/ubuntu/root/
 sudo chmod +x /mnt/ubuntu/root/chroot/install.sh
 
+# apply overlay
+sudo cp -r overlay/system-boot/* /mnt/ubuntu/boot/
+sudo cp -r overlay/writable/* /mnt/ubuntu/
+
 # chroot to raspbian
 sudo chroot /mnt/ubuntu /root/chroot/install.sh
 
 # ----------------------------
 # Clean up
-# revert ld.so.preload fix
-#sed -i 's/^#CHROOT //g' /mnt/ubuntu/etc/ld.so.preload
 sudo rm /mnt/ubuntu/usr/bin/qemu-arm-static
-
-# apply overlay
-sudo cp -ar overlay/system-boot/* /mnt/ubuntu/boot/
-sudo cp -ar overlay/writable/* /mnt/ubuntu/
+sudo rm -rf /root/chroot
 
 # unmount everything
 sudo umount -l /mnt/ubuntu/{dev/pts,dev,sys,proc,boot,}
