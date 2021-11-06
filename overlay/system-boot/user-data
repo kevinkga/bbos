@@ -42,9 +42,9 @@ ssh_import_id:
 #
 users:
 - default
-- name: kaubeela
+- name: kaubeelack
   gecos: Kevin Aubeelack
-  primary_group: kaubeela
+  primary_group: kaubeelack
   groups:
   - dialout
   - sudo
