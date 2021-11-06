@@ -8,7 +8,7 @@ Run the `requirements.sh` script to install common dependencies for these script
 
 # Download a base image.
 
-Disclaimer: This project has been tested with Ubuntu Server images so far. There are no guarantees that this will work with other images. 
+Disclaimer: This project has been tested with Ubuntu Server 22.x images so far. There are no guarantees that this will work with other images. 
 
 Firstly to get started we will need a base image to build upon.
 
