@@ -3,10 +3,10 @@ ORIGINAL_BASE_PATH=$PWD
 BOOT_PART_DEVICE=${TARGET_DEVICE}1
 ROOT_PART_DEVICE=${TARGET_DEVICE}2
 
-IMAGE_NAME=ubuntu-21.10-preinstalled-server-armhf+raspi.img
+IMAGE_NAME=${IMAGE_NAME:'ubuntu-20.04.3-preinstalled-server-arm64+raspi.img'}
 IMAGE_COMPRESSED_NAME=${IMAGE_NAME}.xz
 
-REMOTE_IMAGE_HOST=https://cdimage.ubuntu.com/releases/21.10/release
+REMOTE_IMAGE_HOST=${REMOTE_IMAGE_HOST:'https://cdimage.ubuntu.com/releases/20.04/release'}
 REMOTE_IMAGE_TARGET=${REMOTE_IMAGE_HOST}/${IMAGE_COMPRESSED_NAME}
 
 CACHE_PATH=cache
