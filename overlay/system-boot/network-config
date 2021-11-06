@@ -27,7 +27,7 @@ wifis:
     optional: true
     access-points:
       infectious:
-        password: ""
+        password: "bubblegum"
 #      myworkwifi:
 #        password: "correct battery horse staple"
 #      workssid:

@@ -30,11 +30,11 @@ sudo cp -ar chroot /mnt/ubuntu/root/
 sudo chmod +x /mnt/ubuntu/root/chroot/install.sh
 
 # apply overlay
-sudo cp -r overlay/system-boot/* /mnt/ubuntu/boot/
-sudo cp -r overlay/writable/* /mnt/ubuntu/
+sudo cp -rv overlay/system-boot/* /mnt/ubuntu/boot/
+sudo cp -rv overlay/writable/* /mnt/ubuntu/
 
 # chroot to raspbian
-sudo chroot /mnt/ubuntu /root/chroot/install.sh
+#sudo chroot /mnt/ubuntu /root/chroot/install.sh
 
 # ----------------------------
 # Clean up
