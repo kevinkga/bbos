@@ -21,12 +21,13 @@ mount --bind /dev /mnt/ubuntu/dev/
 mount --bind /sys /mnt/ubuntu/sys/
 mount --bind /proc /mnt/ubuntu/proc/
 mount --bind /dev/pts /mnt/ubuntu/dev/pts
+mount --bind /run /mnt/ubuntu/run
 
 #sed -i 's/^/#CHROOT /g' /mnt/ubuntu/etc/ld.so.preload
 
 cp /usr/bin/qemu-arm-static /mnt/ubuntu/usr/bin/
 
-cp -ar chroot /mnt/ubuntu/root/
+cp -arv chroot /mnt/ubuntu/root/
 chmod +x /mnt/ubuntu/root/chroot/install.sh
 
 # apply overlay
@@ -35,6 +36,7 @@ cp -rv overlay/writable/* /mnt/ubuntu/
 
 # chroot to ubuntu
 chroot /mnt/ubuntu /root/chroot/install.sh
+#chroot /mnt/ubuntu /bin/bash
 
 # ----------------------------
 # Clean up

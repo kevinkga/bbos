@@ -3,10 +3,10 @@ ORIGINAL_BASE_PATH=$PWD
 BOOT_PART_DEVICE=${TARGET_DEVICE}1
 ROOT_PART_DEVICE=${TARGET_DEVICE}2
 
-IMAGE_NAME=${IMAGE_NAME:'ubuntu-20.04.3-preinstalled-server-arm64+raspi.img'}
+IMAGE_NAME="ubuntu-20.04.3-preinstalled-server-arm64+raspi.img"
 IMAGE_COMPRESSED_NAME=${IMAGE_NAME}.xz
 
-REMOTE_IMAGE_HOST=${REMOTE_IMAGE_HOST:'https://cdimage.ubuntu.com/releases/20.04/release'}
+REMOTE_IMAGE_HOST="https://cdimage.ubuntu.com/releases/20.04/release"
 REMOTE_IMAGE_TARGET=${REMOTE_IMAGE_HOST}/${IMAGE_COMPRESSED_NAME}
 
 CACHE_PATH=cache
@@ -19,7 +19,7 @@ ENLARGED_IMAGE=${CACHED_ENLARGED_IMAGES}/enlarged-${IMAGE_NAME}
 mkdir -p ${CACHED_ORIGINAL_IMAGES}
 mkdir -p ${CACHED_ENLARGED_IMAGES}
 
-rm cache/ENLARGED_IMAGES/enlarged-ubuntu-21.10-preinstalled-server-armhf+raspi.img
+rm ${ENLARGED_IMAGE}
 if test -f "$BASE_IMAGE"; then
   echo "Using ${BASE_IMAGE} as base image"
 else
@@ -36,6 +36,7 @@ fi
 #burn image
 umount ${BOOT_PART_DEVICE};
 umount ${ROOT_PART_DEVICE};
+echo Writing the image ${ENLARGED_IMAGE} to ${TARGET_DEVICE}...
 dd bs=4M if=${ENLARGED_IMAGE} of=${TARGET_DEVICE} conv=fsync status=progress
 
 #check burnt image
