@@ -1,1 +1,1 @@
-sudo apt install cloud-guest-utils
+sudo apt install cloud-guest-utils qemu-user-static
