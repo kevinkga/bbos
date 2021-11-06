@@ -12,12 +12,12 @@ Disclaimer: This project has been tested with Ubuntu Server 22.x images so far. 
 
 Firstly to get started we will need a base image to build upon.
 
-For example, fetch a base Ubuntu Server image from here https://ubuntu.com/download/raspberry-pi and save the image in your Downloads folder (e.g `ubuntu-21.10-preinstalled-server-armhf+raspi.img.xz`).
+For example, fetch a base Ubuntu Server image from http://cdimage.ubuntu.com/ubuntu-server/daily-preinstalled/current or the official https://ubuntu.com/download/raspberry-pi and save the image in your Downloads folder (e.g `jammy-preinstalled-server-armhf+raspi.img.xz`).
 This file will typically be stored compressed using xz, as hinted by the file extension. 
 You will need to uncompress the image before being able to use it by using the following command:
 ```
 cd ~/Downloads/
-unxz ubuntu-21.10-preinstalled-server-armhf+raspi.img
+unxz jammy-preinstalled-server-armhf+raspi.img
 ```
 
 # (optional) Resizing the base image
@@ -27,9 +27,9 @@ This is where the `resizeImg.sh` tool comes in.
 
 For example, if you need 5GB more space for your customisations, you can issue the following command:
 
-`./resizeImg.sh ~/Downloads/ubuntu-21.10-preinstalled-server-armhf+raspi.img 4000`
+`./resizeImg.sh ~/Downloads/jammy-preinstalled-server-armhf+raspi.img 4000`
 
-This tells the tool to *make a larger copy* of the image in the current path. The image in the current path will be named `enlarged-ubuntu-21.10-preinstalled-server-armhf+raspi.img` and will be 4000Mb larger than the original one.
+This tells the tool to *make a larger copy* of the image in the current path. The image in the current path will be named `enlarged-jammy-preinstalled-server-armhf+raspi.img` and will be 4000Mb larger than the original one.
 
 # Customisations
 There are two types of customisations that are implemented by this utility:
@@ -54,11 +54,11 @@ These are files that you want to add or replace into the base image. These are s
 # Build the image
 Building the image itself is simple. Just issue the following command: `./createImage.sh <your base image>`
 
-e.g. `./createImage.sh enlarged-ubuntu-21.10-preinstalled-server-armhf+raspi.img`.
+e.g. `./createImage.sh enlarged-jammy-preinstalled-server-armhf+raspi.img`.
 
 # Burn the image.
 There are many tools that will write images to disk. However, a simple method is using DD:
-`sudo dd bs=4M if=enlarged-ubuntu-21.10-preinstalled-server-armhf+raspi.img  of=/dev/sdX conv=fsync`
+`sudo dd bs=4M if=enlarged-jammy-preinstalled-server-armhf+raspi.img  of=/dev/sdX conv=fsync`
 
 # Summary
 In the, once you've understood the tools and the concepts around them, you can simplify the entire process of building images using the `deploy.sh` utility instead. This assumes that your customisations are in place and that you only want to build and deploy an image to a disk device.
