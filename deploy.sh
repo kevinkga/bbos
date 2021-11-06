@@ -3,10 +3,14 @@ ORIGINAL_BASE_PATH=$PWD
 BOOT_PART_DEVICE=${TARGET_DEVICE}1
 ROOT_PART_DEVICE=${TARGET_DEVICE}2
 
-IMAGE_NAME="jammy-preinstalled-server-armhf+raspi.img"
+DISTRO=ubuntu
+DIST_VER=21.04
+TYPE=server
+ARCH=armhf
+IMAGE_NAME="${DISTRO}-${DIST_VER}-preinstalled-${TYPE}-${ARCH}+raspi.img"
 IMAGE_COMPRESSED_NAME=${IMAGE_NAME}.xz
 
-REMOTE_IMAGE_HOST="http://cdimage.ubuntu.com/ubuntu-server/daily-preinstalled/current"
+REMOTE_IMAGE_HOST="https://cdimage.ubuntu.com/releases/${DIST_VER}/release/"
 REMOTE_IMAGE_TARGET=${REMOTE_IMAGE_HOST}/${IMAGE_COMPRESSED_NAME}
 
 CACHE_PATH=cache
