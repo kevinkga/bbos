@@ -36,7 +36,7 @@ fi
 #burn image
 umount ${BOOT_PART_DEVICE};
 umount ${ROOT_PART_DEVICE};
-dd bs=4M if=${ENLARGED_IMAGE} of=${TARGET_DEVICE} conv=fsync
+dd bs=4M if=${ENLARGED_IMAGE} of=${TARGET_DEVICE} conv=fsync status=progress
 
 #check burnt image
 partprobe
