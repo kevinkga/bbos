@@ -1,8 +1,14 @@
 export DEBIAN_FRONTEND=noninteractive
+
+mkswap /swapfile
+swapon /swapfile
+free -h
+
 cd /root/chroot
 df -h
 
-apt -yq update && apt install -yq ansible
+apt -yq update && apt install -yq ansible linux-modules-extra-raspi
+apt -yq upgrade
 apt -yq autoclean
 apt -yq autoremove
 apt -yq purge
