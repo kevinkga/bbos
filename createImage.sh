@@ -52,8 +52,7 @@ rm -rf /root/chroot
 
 # unmount everything
 umount -l ${TARGET_CHROOT_DIR}/{dev/pts,dev,sys,proc,system-boot,}
-rm -rf ${TARGET_CHROOT_DIR}/system-boot
 umount -l ${SWAPFILE}
-losetup -d ${LOOP_DEVICE}
 
-# qemu-system-arm -kernel system-boot/vmlinuz  -cpu arm1176 -m 256 -M versatilepb -dtb system-boot/bcm2835-rpi-zero-w.dtb -no-reboot -serial stdio -append 'root=/dev/sda2 panic=1 rootfstype=ext4 rw' -hda ~/Documents/ubuntu-21.10-preinstalled-server-armhf+raspi.img
+rm -rf ${TARGET_CHROOT_DIR}/system-boot
+losetup -d ${LOOP_DEVICE}
