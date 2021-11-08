@@ -7,8 +7,9 @@ free -h
 cd /root/chroot
 df -h
 
-apt -yq update && apt install -yq ansible linux-modules-extra-raspi
+apt -yq update
 apt -yq upgrade
+apt install -yq ansible linux-modules-extra-raspi
 apt -yq autoclean
 apt -yq autoremove
 apt -yq purge
