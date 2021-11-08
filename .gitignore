@@ -1,2 +1,4 @@
 *.img
 cache/
+chroot/id_rsa
+chroot/ratos-configuration/
