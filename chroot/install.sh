@@ -8,7 +8,7 @@ cd /root/chroot
 df -h
 
 apt -yq update
-apt -yq upgrade
+#apt -yq upgrade
 apt install -yq ansible linux-modules-extra-raspi
 apt -yq autoclean
 apt -yq autoremove
@@ -20,12 +20,8 @@ ansible-playbook --connection=local playbook.yml
 cd ${SRC_DIR};
 
 # klipper config
-rm -rf /home/klipper/klipper_config; mv ratos-configuration /home/klipper/klipper_config
-
-mkdir -p /home/klipper/.ssh;
-cat id_rsa > /home/klipper/.ssh/id_rsa
-cat authorized_keys > /home/klipper/.ssh/authorized_keys
-chown -R klipper:klipper /home/klipper/.ssh
+rm -rf /home/klipper/klipper_config; cp -r ratos-configuration /home/klipper/klipper_config
+chown -R klipper:klipper /home/klipper
 chmod -R 600 /home/klipper/.ssh
 
 apt remove -yq ansible

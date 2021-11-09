@@ -35,11 +35,16 @@ touch ${TARGET_CHROOT_DIR}/swapfile; mount --bind ${SWAPFILE} ${TARGET_CHROOT_DI
 cp /usr/bin/qemu-arm-static ${TARGET_CHROOT_DIR}/usr/bin/
 
 cp -arv chroot ${TARGET_CHROOT_DIR}/root/
-chmod +x ${TARGET_CHROOT_DIR}/root/chroot/install.sh
 
 # apply overlay
 cp -rv overlay/system-boot/* ${TARGET_CHROOT_DIR}/system-boot/
 cp -rv overlay/writable/* ${TARGET_CHROOT_DIR}/
+# apply overlay
+cp -rv secrets/system-boot/* ${TARGET_CHROOT_DIR}/system-boot/
+cp -rv secrets/writable/* ${TARGET_CHROOT_DIR}/
+
+chmod +x ${TARGET_CHROOT_DIR}/root/chroot/install.sh
+
 
 # chroot to ubuntu
 chroot ${TARGET_CHROOT_DIR} /root/chroot/install.sh
