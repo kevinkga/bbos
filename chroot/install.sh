@@ -14,15 +14,16 @@ apt -yq autoclean
 apt -yq autoremove
 apt -yq purge
 
+# klipper config
+rm -rf /home/klipper/klipper_config; cp -r ratos-configuration /home/klipper/klipper_config
+chown -R klipper:klipper /home/klipper
+chmod -R 600 /home/klipper/.ssh
+
 SRC_DIR=$PWD
 cd klipper-ubuntu
 ansible-playbook --connection=local playbook.yml
 cd ${SRC_DIR};
 
-# klipper config
-rm -rf /home/klipper/klipper_config; cp -r ratos-configuration /home/klipper/klipper_config
-chown -R klipper:klipper /home/klipper
-chmod -R 600 /home/klipper/.ssh
 
 apt remove -yq ansible
 df -h
