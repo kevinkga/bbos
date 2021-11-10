@@ -1,2 +1,2 @@
 SUBSYSTEMS=="usb", ATTRS{idProduct}=="614e",  ATTRS{idVendor}=="1d50", ACTION=="add", SYMLINK+="btt-octopus-11"
-ACTION=="remove", ENV{DEVLINKS}=="/dev/btt-octopus-11"
+ACTION=="remove", ENV{DEVLINKS}=="/dev/btt-octopus-11", GROUP="klipper"
