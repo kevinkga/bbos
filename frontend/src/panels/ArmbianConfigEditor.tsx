@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Card, Button, Space, Typography, Alert, Spin, Tabs, Switch, notification, Tooltip, Badge } from 'antd'
+import { Card, Button, Space, Typography, Alert, Spin, Tabs, Switch, notification, Tooltip, Badge, Modal } from 'antd'
 import { 
   SaveOutlined, 
   ReloadOutlined, 
@@ -10,13 +10,16 @@ import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
   WarningOutlined,
-  InfoCircleOutlined
+  InfoCircleOutlined,
+  PlayCircleOutlined,
+  BuildOutlined
 } from '@ant-design/icons'
 import Form from '@rjsf/antd'
 import validator from '@rjsf/validator-ajv8'
 import { RJSFSchema, UiSchema } from '@rjsf/utils'
 import { IChangeEvent } from '@rjsf/core'
 import { ArmbianConfiguration } from '@/types'
+import { useSocket } from '@/hooks/useSocket'
 
 const { Title, Text } = Typography
 
@@ -45,6 +48,31 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
   const [activeTab, setActiveTab] = useState('form')
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [isBuilding, setIsBuilding] = useState(false)
+
+  // Socket.io for build submission
+  const { emit } = useSocket({
+    autoConnect: true,
+    onBuildUpdate: (build) => {
+      console.log('🏗️ Build update in config editor:', build);
+      if (isBuilding && build.status === 'completed') {
+        setIsBuilding(false);
+        notification.success({
+          message: 'Build Completed',
+          description: `Image build completed successfully! Check the Build Status panel for download links.`,
+          placement: 'topRight',
+          duration: 6
+        });
+      } else if (isBuilding && build.status === 'failed') {
+        setIsBuilding(false);
+        notification.error({
+          message: 'Build Failed', 
+          description: `Image build failed: ${build.message}`,
+          placement: 'topRight'
+        });
+      }
+    }
+  })
 
   // Load Armbian schema from our schemas directory
   useEffect(() => {
@@ -259,13 +287,31 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
 
     setSaving(true)
     try {
-      await onSave?.(formData)
+      // Ensure configuration has required metadata
+      const configToSave: ArmbianConfiguration = {
+        ...formData,
+        id: formData.id || crypto.randomUUID(),
+        userId: formData.userId || 'current-user',
+        name: formData.name || `Configuration ${new Date().toISOString()}`,
+        updatedAt: new Date().toISOString(),
+        version: (formData.version || 0) + 1
+      }
+
+      // If this is a new configuration, set creation time
+      if (!formData.createdAt) {
+        configToSave.createdAt = new Date().toISOString()
+      }
+
+      // Update form data with the enhanced config
+      setFormData(configToSave)
+
+      await onSave?.(configToSave)
       setLastSaved(new Date())
       setHasUnsavedChanges(false)
       
       notification.success({
         message: 'Configuration Saved',
-        description: `Configuration saved successfully at ${new Date().toLocaleTimeString()}`,
+        description: `"${configToSave.name}" saved successfully (v${configToSave.version})`,
         duration: 3
       })
       
@@ -273,7 +319,7 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
       if (warnings.length > 0) {
         notification.warning({
           message: 'Configuration Warnings',
-          description: `Saved with ${warnings.length} warning(s). Check the warnings below.`,
+          description: `Saved with ${warnings.length} warning(s). Review configuration before building.`,
           duration: 5
         })
       }
@@ -288,6 +334,24 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
       setSaving(false)
     }
   }, [formData, isValid, onSave, warnings])
+
+  // Auto-save functionality
+  useEffect(() => {
+    if (hasUnsavedChanges && formData && isValid) {
+      const autoSaveTimer = setTimeout(() => {
+        console.log('Auto-saving configuration...')
+        // Save as draft in localStorage
+        const draftKey = `bbos-draft-${formData.id || 'new'}`
+        localStorage.setItem(draftKey, JSON.stringify({
+          ...formData,
+          savedAt: new Date().toISOString(),
+          isDraft: true
+        }))
+      }, 30000) // Auto-save after 30 seconds of inactivity
+
+      return () => clearTimeout(autoSaveTimer)
+    }
+  }, [hasUnsavedChanges, formData, isValid])
 
   const handleExport = useCallback(() => {
     if (formData) {
@@ -323,6 +387,64 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
     }
     input.click()
   }, [])
+
+  // Build submission function
+  const handleBuildSubmission = useCallback(() => {
+    if (!formData || !isValid) {
+      notification.warning({
+        message: 'Configuration Invalid',
+        description: 'Please fix all validation errors before starting a build.',
+        placement: 'topRight'
+      });
+      return;
+    }
+
+    if (!formData.board?.name || !formData.distribution?.release) {
+      notification.warning({
+        message: 'Missing Required Fields',
+        description: 'Please select a target board and distribution before building.',
+        placement: 'topRight'
+      });
+      return;
+    }
+
+    // Show confirmation modal
+    Modal.confirm({
+      title: 'Start Armbian Build',
+      content: (
+        <div>
+          <p>This will start building an Armbian image with the following configuration:</p>
+          <ul>
+            <li><strong>Board:</strong> {formData.board.name}</li>
+            <li><strong>Distribution:</strong> {formData.distribution.release}</li>
+            <li><strong>Type:</strong> {formData.distribution.type}</li>
+            {formData.distribution.desktop && (
+              <li><strong>Desktop:</strong> {formData.distribution.desktop}</li>
+            )}
+          </ul>
+          <p>The build process may take 10-30 minutes depending on complexity.</p>
+        </div>
+      ),
+      okText: 'Start Build',
+      cancelText: 'Cancel',
+      onOk() {
+        setIsBuilding(true);
+        
+        // Submit build job via Socket.io
+        emit('build:submit', {
+          configuration: formData,
+          userId: 'current-user' // TODO: Get from auth context
+        });
+
+        notification.info({
+          message: 'Build Started',
+          description: 'Your Armbian image build has been queued. You can monitor progress in the Build Status panel.',
+          placement: 'topRight',
+          duration: 4
+        });
+      }
+    });
+  }, [formData, isValid, emit])
 
   const formProps = {
     schema: schema || {},
@@ -441,6 +563,16 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
                 {saving ? 'Saving...' : 'Save Configuration'}
               </Button>
             </Badge>
+            <Button 
+              type="primary"
+              danger
+              icon={<BuildOutlined />} 
+              onClick={handleBuildSubmission}
+              loading={isBuilding}
+              disabled={!isValid || readonly || isBuilding || !formData?.board?.name || !formData?.distribution?.release}
+            >
+              {isBuilding ? 'Building...' : 'Build Image'}
+            </Button>
           </Space>
         </div>
       </div>

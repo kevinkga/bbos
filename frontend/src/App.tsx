@@ -11,12 +11,14 @@ import {
 } from '@ant-design/icons'
 import { FlexLayoutFactory } from '@/layouts/FlexLayoutFactory'
 import { useAppStore } from '@/stores/app'
+import { ArmbianConfiguration } from '@/types'
 import { useSocket, BuildStatus } from '@/hooks/useSocket'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ConnectionStatusCompact } from '@/components/ConnectionStatus'
 import WelcomePanel from '@/panels/WelcomePanel'
 import ArmbianConfigEditor from '@/panels/ArmbianConfigEditor'
 import BuildStatusPanel from '@/panels/BuildStatusPanel'
+import FileExplorerPanel from '@/panels/FileExplorerPanel'
 import 'flexlayout-react/style/light.css'
 import './App.css'
 
@@ -141,7 +143,31 @@ const App: React.FC<AppProps> = ({ theme: appTheme = 'light' }) => {
             initialConfig={currentConfig || undefined}
             onSave={(config) => {
               console.log('Saving configuration:', config)
-              // TODO: Implement save logic
+              
+              // Check if this is an existing configuration or a new one
+              const existingIndex = configurations.findIndex(c => c.id === config.id)
+              
+              if (existingIndex >= 0) {
+                // Update existing configuration
+                const { updateConfiguration } = useAppStore.getState()
+                updateConfiguration(config.id, config)
+                
+                notification.success({
+                  message: 'Configuration Updated',
+                  description: `"${config.name}" has been updated successfully`,
+                  placement: 'topRight'
+                })
+              } else {
+                // Add new configuration
+                const { addConfiguration } = useAppStore.getState()
+                addConfiguration(config)
+                
+                notification.success({
+                  message: 'Configuration Created',
+                  description: `"${config.name}" has been created successfully`,
+                  placement: 'topRight'
+                })
+              }
             }}
             onValidationChange={(isValid, errors) => {
               console.log('Validation:', { isValid, errors })
@@ -176,9 +202,110 @@ const App: React.FC<AppProps> = ({ theme: appTheme = 'light' }) => {
           />
         )
       
-      // Placeholder panels for other components
       case 'FileExplorerPanel':
-        return <div className="p-4">File Explorer Panel - Coming Soon</div>
+        return (
+          <FileExplorerPanel
+            onFileSelect={(file) => {
+              console.log('File selected:', file)
+              
+              if (file.type === 'config' && file.content) {
+                // Load configuration into the editor
+                const config = file.content as ArmbianConfiguration
+                
+                notification.info({
+                  message: 'Configuration Loaded',
+                  description: `"${file.title}" loaded into the configuration editor`,
+                  placement: 'topRight',
+                  duration: 3
+                })
+                
+                // You would typically set this in a shared state or pass it to the editor
+                console.log('Loading configuration into editor:', config)
+              } else if (file.type === 'template') {
+                // Load template configuration
+                const templateConfigs = {
+                  'template-minimal': {
+                    id: crypto.randomUUID(),
+                    userId: 'current-user',
+                    name: 'Minimal Server Configuration',
+                    description: 'Basic server setup without desktop environment',
+                    board: { family: 'rockchip', name: 'rock-5b', architecture: 'arm64' },
+                    distribution: { release: 'bookworm', type: 'server' },
+                    ssh: { enabled: true, port: 22, passwordAuth: false, rootLogin: false },
+                    packages: { install: ['wget', 'curl', 'nano', 'htop', 'fail2ban'] },
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    version: 1
+                  },
+                  'template-desktop': {
+                    id: crypto.randomUUID(),
+                    userId: 'current-user',
+                    name: 'Desktop Environment Configuration',
+                    description: 'Full desktop environment with common applications',
+                    board: { family: 'rockchip', name: 'rock-5b', architecture: 'arm64' },
+                    distribution: { release: 'bookworm', type: 'desktop', desktop: 'xfce' },
+                    ssh: { enabled: true, port: 22, passwordAuth: false, rootLogin: false },
+                    packages: { install: ['firefox-esr', 'libreoffice', 'gimp', 'vlc', 'code'] },
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    version: 1
+                  },
+                  'template-iot': {
+                    id: crypto.randomUUID(),
+                    userId: 'current-user',
+                    name: 'IoT Gateway Configuration', 
+                    description: 'Optimized for IoT applications and edge computing',
+                    board: { family: 'rockchip', name: 'rock-5b', architecture: 'arm64' },
+                    distribution: { release: 'bookworm', type: 'server' },
+                    ssh: { enabled: true, port: 22, passwordAuth: false, rootLogin: false },
+                    packages: { install: ['docker.io', 'mosquitto', 'node-red', 'influxdb'] },
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    version: 1
+                  }
+                }
+                
+                const templateConfig = templateConfigs[file.id as keyof typeof templateConfigs]
+                if (templateConfig) {
+                  notification.info({
+                    message: 'Template Loaded',
+                    description: `Template "${file.title}" loaded. You can modify and save it as a new configuration.`,
+                    placement: 'topRight',
+                    duration: 4
+                  })
+                  console.log('Loading template into editor:', templateConfig)
+                }
+              }
+            }}
+            onFileCreate={(file) => {
+              console.log('File created:', file)
+              
+              notification.success({
+                message: 'File Created',
+                description: `"${file.title}" has been created successfully`,
+                placement: 'topRight'
+              })
+            }}
+            onFileUpdate={(file) => {
+              console.log('File updated:', file)
+              
+              notification.info({
+                message: 'File Updated',
+                description: `"${file.title}" has been updated`,
+                placement: 'topRight'
+              })
+            }}
+            onFileDelete={(fileId) => {
+              console.log('File deleted:', fileId)
+              
+              notification.success({
+                message: 'File Deleted',
+                description: 'File has been deleted successfully',
+                placement: 'topRight'
+              })
+            }}
+          />
+        )
       
       case 'SearchPanel':
         return <div className="p-4">Search Panel - Coming Soon</div>
