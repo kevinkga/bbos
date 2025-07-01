@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Layout as FlexLayout, Model, TabNode } from 'flexlayout-react'
-import { ConfigProvider, theme, Button, Dropdown, Typography, Tooltip } from 'antd'
+import { ConfigProvider, theme, Button, Dropdown, Typography, Tooltip, notification } from 'antd'
 import { 
   SettingOutlined, 
   LayoutOutlined, 
@@ -11,6 +11,9 @@ import {
 } from '@ant-design/icons'
 import { FlexLayoutFactory } from '@/layouts/FlexLayoutFactory'
 import { useAppStore } from '@/stores/app'
+import { useSocket, BuildStatus } from '@/hooks/useSocket'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { ConnectionStatusCompact } from '@/components/ConnectionStatus'
 import WelcomePanel from '@/panels/WelcomePanel'
 import ArmbianConfigEditor from '@/panels/ArmbianConfigEditor'
 import BuildStatusPanel from '@/panels/BuildStatusPanel'
@@ -26,6 +29,7 @@ interface AppProps {
 const App: React.FC<AppProps> = ({ theme: appTheme = 'light' }) => {
   const [model, setModel] = useState<Model | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [buildStatuses, setBuildStatuses] = useState<BuildStatus[]>([])
   
   // Zustand store
   const { 
@@ -37,6 +41,60 @@ const App: React.FC<AppProps> = ({ theme: appTheme = 'light' }) => {
 
   // Get current configuration (first one for now)
   const currentConfig = configurations.length > 0 ? configurations[0] : null
+
+  // Socket.io integration for real-time communication
+  const { emit } = useSocket({
+    autoConnect: true,
+    onBuildUpdate: useCallback((build: BuildStatus) => {
+      console.log('🏗️ Build update received:', build);
+      
+      setBuildStatuses(prev => {
+        const existingIndex = prev.findIndex(b => b.id === build.id);
+        if (existingIndex >= 0) {
+          // Update existing build
+          const updated = [...prev];
+          updated[existingIndex] = build;
+          return updated;
+        } else {
+          // Add new build
+          return [...prev, build];
+        }
+      });
+
+      // Show notifications for important build status changes
+      if (build.status === 'completed') {
+        notification.success({
+          message: 'Build Completed',
+          description: `Build ${build.id} completed successfully`,
+          placement: 'topRight'
+        });
+      } else if (build.status === 'failed') {
+        notification.error({
+          message: 'Build Failed',
+          description: `Build ${build.id} failed: ${build.message}`,
+          placement: 'topRight'
+        });
+      }
+    }, []),
+    onStatusChange: useCallback((status: 'connected' | 'disconnected' | 'error', errorMsg?: string) => {
+      console.log('🔌 Connection status changed:', status, errorMsg);
+      
+      if (status === 'connected') {
+        notification.success({
+          message: 'Connected to Backend',
+          description: 'Real-time communication established',
+          placement: 'topRight',
+          duration: 3
+        });
+      } else if (status === 'error') {
+        notification.error({
+          message: 'Connection Error',
+          description: errorMsg || 'Failed to connect to backend',
+          placement: 'topRight'
+        });
+      }
+    }, [])
+  })
 
   // Initialize FlexLayout model
   useEffect(() => {
@@ -96,12 +154,18 @@ const App: React.FC<AppProps> = ({ theme: appTheme = 'light' }) => {
           <BuildStatusPanel
             onViewLogs={(buildId) => {
               console.log('View logs for:', buildId)
+              // Emit request for build logs
+              emit('build:getLogs', { buildId })
             }}
             onDownloadArtifact={(buildId, artifactId) => {
               console.log('Download artifact:', { buildId, artifactId })
+              // Emit request for artifact download
+              emit('build:downloadArtifact', { buildId, artifactId })
             }}
             onCancelBuild={(buildId) => {
               console.log('Cancel build:', buildId)
+              // Emit build cancellation request
+              emit('build:cancel', { buildId })
             }}
           />
         )
@@ -210,16 +274,22 @@ const App: React.FC<AppProps> = ({ theme: appTheme = 'light' }) => {
   }
 
   return (
-    <ConfigProvider
-      theme={{
-        algorithm: appTheme === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm,
-        token: {
-          colorPrimary: '#1890ff',
-          borderRadius: 4,
-        }
+    <ErrorBoundary
+      onError={(error, errorInfo) => {
+        console.error('🚨 App Error:', error, errorInfo);
+        // Could send to error reporting service here
       }}
     >
-      <div className="h-screen flex flex-col bg-gray-50">
+      <ConfigProvider
+        theme={{
+          algorithm: appTheme === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm,
+          token: {
+            colorPrimary: '#1890ff',
+            borderRadius: 4,
+          }
+        }}
+      >
+        <div className="h-screen flex flex-col bg-gray-50">
         {/* Top toolbar */}
         <div className="flex-shrink-0 h-12 bg-white border-b border-gray-200 flex items-center justify-between px-4">
           <div className="flex items-center space-x-4">
@@ -232,6 +302,8 @@ const App: React.FC<AppProps> = ({ theme: appTheme = 'light' }) => {
           </div>
           
           <div className="flex items-center space-x-2">
+            <ConnectionStatusCompact className="mr-3" />
+            
             <Dropdown
               menu={{
                 items: layoutPresets.map(preset => ({
@@ -284,6 +356,7 @@ const App: React.FC<AppProps> = ({ theme: appTheme = 'light' }) => {
         </div>
       </div>
     </ConfigProvider>
+    </ErrorBoundary>
   )
 }
 
