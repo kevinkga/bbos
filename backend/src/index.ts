@@ -12,6 +12,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { ArmbianBuilder, ArmbianConfiguration } from './services/armbianBuilder.js';
 import { BuildTracker, BuildJob } from './services/buildTracker.js';
+import { HardwareFlasher, FlashProgress } from './services/hardwareFlasher.js';
 
 // Load environment variables
 dotenv.config();
@@ -25,6 +26,7 @@ const CORS_ORIGINS = process.env.CORS_ORIGINS?.split(',') || ['http://localhost:
 // Initialize services
 const buildTracker = new BuildTracker(process.env.BUILD_DIR || '/tmp/bbos-builds');
 const armbianBuilder = new ArmbianBuilder();
+const hardwareFlasher = new HardwareFlasher();
 
 const app = express();
 const httpServer = createServer(app);
@@ -72,8 +74,9 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health check endpoint
-app.get('/health', (req: express.Request, res: express.Response) => {
+app.get('/health', async (req: express.Request, res: express.Response) => {
   const queueStatus = buildTracker.getQueueStatus();
+  const hardwareAvailable = await hardwareFlasher.isAvailable();
   
   res.json({ 
     status: 'ok', 
@@ -87,7 +90,11 @@ app.get('/health', (req: express.Request, res: express.Response) => {
       buildDir: process.env.BUILD_DIR || '/tmp/bbos-builds',
       downloadCache: process.env.DOWNLOAD_CACHE || '/tmp/bbos-cache'
     },
-    buildQueue: queueStatus
+    buildQueue: queueStatus,
+    hardwareFlashing: {
+      available: hardwareAvailable,
+      toolPath: hardwareAvailable ? `${process.env.HOME}/rkdeveloptool/rkdeveloptool` : null
+    }
   });
 });
 
@@ -254,6 +261,95 @@ app.get('/api/builds/:buildId/artifacts/:filename', async (req: express.Request,
   }
 });
 
+// Hardware flashing API endpoints
+app.get('/api/hardware/capabilities', async (req: express.Request, res: express.Response) => {
+  try {
+    const capabilities = await hardwareFlasher.getCapabilities();
+    res.json(capabilities);
+  } catch (error) {
+    console.error('❌ Failed to get hardware capabilities:', error);
+    res.status(500).json({ error: 'Failed to get hardware capabilities' });
+  }
+});
+
+app.get('/api/hardware/devices', async (req: express.Request, res: express.Response) => {
+  try {
+    const devices = await hardwareFlasher.detectDevices();
+    res.json({ devices });
+  } catch (error) {
+    console.error('❌ Failed to detect devices:', error);
+    res.status(500).json({ error: 'Failed to detect devices' });
+  }
+});
+
+app.post('/api/hardware/flash', async (req: express.Request, res: express.Response) => {
+  try {
+    const { buildId, deviceId } = req.body;
+    
+    if (!buildId || !deviceId) {
+      return res.status(400).json({ error: 'buildId and deviceId are required' });
+    }
+
+    // Get the build job to find the image path
+    const buildJob = buildTracker.getBuild(buildId);
+    if (!buildJob) {
+      return res.status(404).json({ error: 'Build job not found' });
+    }
+
+    // Find the main image artifact
+    const imageArtifact = buildJob.artifacts?.find(a => a.type === 'image' && a.name.includes('BBOS_Armbian'));
+    if (!imageArtifact) {
+      return res.status(404).json({ error: 'No image artifact found for this build' });
+    }
+
+    console.log(`🔥 Flash request: Build ${buildId} → Device ${deviceId}`);
+
+    // Start flashing process
+    const flashJobId = await hardwareFlasher.flashImage(
+      buildId,
+      imageArtifact.path,
+      deviceId,
+      (progress: FlashProgress) => {
+        // Emit real-time progress via Socket.IO
+        io.emit('flash:progress', {
+          flashJobId,
+          buildId,
+          deviceId,
+          ...progress
+        });
+      }
+    );
+
+    res.status(201).json({
+      message: 'Flash process started',
+      flashJobId,
+      buildId,
+      deviceId,
+      imagePath: imageArtifact.path
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to start flash process:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get('/api/hardware/flash/:flashJobId', (req: express.Request, res: express.Response) => {
+  const { flashJobId } = req.params;
+  const flashJob = hardwareFlasher.getFlashJob(flashJobId);
+  
+  if (!flashJob) {
+    return res.status(404).json({ error: 'Flash job not found' });
+  }
+  
+  res.json(flashJob);
+});
+
+app.get('/api/hardware/flash', (req: express.Request, res: express.Response) => {
+  const flashJobs = hardwareFlasher.getAllFlashJobs();
+  res.json({ flashJobs });
+});
+
 // Helper function to get content type
 function getContentType(artifactType: string): string {
   switch (artifactType) {
@@ -379,6 +475,81 @@ io.on('connection', (socket) => {
     } else {
       socket.emit('build:error', {
         error: 'Cannot cancel build in current status',
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
+  // Hardware flashing event handlers
+  socket.on('hardware:detect', async () => {
+    try {
+      const devices = await hardwareFlasher.detectDevices();
+      socket.emit('hardware:devices', {
+        devices,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      socket.emit('hardware:error', {
+        error: 'Failed to detect devices',
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
+  socket.on('hardware:flash', async (data) => {
+    console.log('🔥 Hardware flash request:', data);
+    
+    try {
+      const { buildId, deviceId } = data;
+      
+      // Get the build job to find the image path
+      const buildJob = buildTracker.getBuild(buildId);
+      if (!buildJob) {
+        socket.emit('hardware:error', {
+          error: 'Build job not found',
+          timestamp: new Date().toISOString()
+        });
+        return;
+      }
+
+      // Find the main image artifact
+      const imageArtifact = buildJob.artifacts?.find(a => a.type === 'image' && a.name.includes('BBOS_Armbian'));
+      if (!imageArtifact) {
+        socket.emit('hardware:error', {
+          error: 'No image artifact found for this build',
+          timestamp: new Date().toISOString()
+        });
+        return;
+      }
+
+      // Start flashing process
+      const flashJobId = await hardwareFlasher.flashImage(
+        buildId,
+        imageArtifact.path,
+        deviceId,
+        (progress: FlashProgress) => {
+          // Emit real-time progress to all connected clients
+          io.emit('flash:progress', {
+            flashJobId,
+            buildId,
+            deviceId,
+            ...progress
+          });
+        }
+      );
+
+      socket.emit('hardware:flash:started', {
+        flashJobId,
+        buildId,
+        deviceId,
+        message: 'Flash process started successfully',
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('❌ Hardware flash failed:', error);
+      socket.emit('hardware:error', {
+        error: (error as Error).message,
         timestamp: new Date().toISOString()
       });
     }
