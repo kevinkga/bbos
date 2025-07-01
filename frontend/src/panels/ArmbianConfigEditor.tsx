@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react'
-import { Card, Button, Typography, Space, Divider, message } from 'antd'
-import { SaveOutlined, SettingOutlined, InfoCircleOutlined, ReloadOutlined } from '@ant-design/icons'
+import { Card, Button, Typography, Space, Divider, message, Modal } from 'antd'
+import { SaveOutlined, SettingOutlined, InfoCircleOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons'
 import Form from '@rjsf/antd'
 import validator from '@rjsf/validator-ajv8'
 import { RJSFSchema, ErrorSchema } from '@rjsf/utils'
@@ -14,13 +14,15 @@ interface ArmbianConfigEditorProps {
   onValidationChange?: (isValid: boolean, errors: any[]) => void
   initialConfig?: Partial<ArmbianConfiguration>
   readonly?: boolean
+  onDelete?: (configId: string) => void
 }
 
 const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
   onSave,
   onValidationChange,
   initialConfig,
-  readonly = false
+  readonly = false,
+  onDelete
 }) => {
   const [formData, setFormData] = useState<any>(initialConfig || {
     name: 'New Configuration',
@@ -345,6 +347,25 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
     message.info('Form reset to initial values')
   }, [initialConfig])
 
+  const handleDelete = useCallback(() => {
+    if (!initialConfig?.id) {
+      message.error('Cannot delete: No configuration ID found')
+      return
+    }
+
+    Modal.confirm({
+      title: 'Delete Configuration',
+      content: `Are you sure you want to delete "${initialConfig.name || 'this configuration'}"? This action cannot be undone.`,
+      okText: 'Delete',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      onOk() {
+        onDelete?.(initialConfig.id!)
+        message.success('Configuration deleted successfully')
+      }
+    })
+  }, [initialConfig, onDelete])
+
   return (
     <div 
       className="h-full flex flex-col bbos-config-editor-wrapper"
@@ -516,6 +537,20 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
               >
                 Reset
               </Button>
+              {initialConfig?.id && onDelete && (
+                <Button 
+                  icon={<DeleteOutlined />}
+                  onClick={handleDelete}
+                  disabled={readonly}
+                  danger
+                  style={{
+                    borderColor: colors.error[500],
+                    color: colors.error[500]
+                  }}
+                >
+                  Delete
+                </Button>
+              )}
               <Button 
                 type="primary" 
                 icon={<SaveOutlined />}

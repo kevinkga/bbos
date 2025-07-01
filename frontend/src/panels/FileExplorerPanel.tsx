@@ -119,10 +119,10 @@ export const FileExplorerPanel: React.FC<FileExplorerPanelProps> = ({
       ]
 
       // Add configurations from store
-      const configNodes: FileNode[] = configurations.map((config, index) => ({
-        id: `config-${index}`,
-        key: `config-${index}`,
-        title: config.name || `Configuration ${index + 1}`,
+      const configNodes: FileNode[] = configurations.map((config) => ({
+        id: config.id,
+        key: config.id,
+        title: config.name || 'Untitled Configuration',
         type: 'config',
         icon: <FileTextOutlined />,
         content: config,
@@ -322,21 +322,13 @@ export const FileExplorerPanel: React.FC<FileExplorerPanelProps> = ({
       return
     }
 
-    const newFile: FileNode = {
-      id: `${createFileType}-${Date.now()}`,
-      key: `${createFileType}-${Date.now()}`,
-      title: newFileName,
-      type: createFileType,
-      icon: createFileType === 'folder' ? <FolderOutlined /> : <FileTextOutlined />,
-      description: newFileDescription,
-      lastModified: new Date(),
-      parentId: selectedNode?.id || 'configs'
-    }
-
+    let newFile: FileNode
+    
     if (createFileType === 'config') {
-      // Create new Armbian configuration
+      // Create new Armbian configuration with proper UUID
+      const configId = crypto.randomUUID()
       const newConfig: ArmbianConfiguration = {
-        id: newFile.id,
+        id: configId,
         userId: 'current-user', // TODO: Get from auth
         name: newFileName,
         description: newFileDescription,
@@ -346,8 +338,32 @@ export const FileExplorerPanel: React.FC<FileExplorerPanelProps> = ({
         updatedAt: new Date().toISOString(),
         version: 1
       }
-      newFile.content = newConfig
+      
+      newFile = {
+        id: configId,
+        key: configId,
+        title: newFileName,
+        type: createFileType,
+        icon: <FileTextOutlined />,
+        description: newFileDescription,
+        lastModified: new Date(),
+        parentId: selectedNode?.id || 'configs',
+        content: newConfig
+      }
+      
       addConfiguration(newConfig)
+    } else {
+      // For other file types (folder, template, script)
+      newFile = {
+        id: `${createFileType}-${Date.now()}`,
+        key: `${createFileType}-${Date.now()}`,
+        title: newFileName,
+        type: createFileType,
+        icon: createFileType === 'folder' ? <FolderOutlined /> : <FileTextOutlined />,
+        description: newFileDescription,
+        lastModified: new Date(),
+        parentId: selectedNode?.id || 'configs'
+      }
     }
 
     if (onFileCreate) onFileCreate(newFile)
@@ -363,7 +379,7 @@ export const FileExplorerPanel: React.FC<FileExplorerPanelProps> = ({
     if (node.type === 'config' && node.content) {
       const duplicatedConfig = {
         ...(node.content as ArmbianConfiguration),
-        id: `${node.id}-copy`,
+        id: crypto.randomUUID(),
         name: `${node.title} (Copy)`,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()

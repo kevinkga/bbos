@@ -173,6 +173,22 @@ const App: React.FC<AppProps> = ({ theme = 'light' }) => {
                 })
               }
             }}
+            onDelete={(configId) => {
+              console.log('Deleting configuration:', configId)
+              const { deleteConfiguration } = useAppStore.getState()
+              deleteConfiguration(configId)
+              
+              // Clear the selected config if it was the one being deleted
+              if (selectedConfig?.id === configId) {
+                setSelectedConfig(null)
+              }
+              
+              notification.success({
+                message: 'Configuration Deleted',
+                description: 'Configuration has been deleted successfully',
+                placement: 'topRight'
+              })
+            }}
             onValidationChange={(isValid, errors) => {
               console.log('Validation:', { isValid, errors })
             }}
