@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Card, Button, Space, Typography, Alert, Spin, Tabs, Switch } from 'antd'
+import { Card, Button, Space, Typography, Alert, Spin, Tabs, Switch, notification, Tooltip, Badge } from 'antd'
 import { 
   SaveOutlined, 
   ReloadOutlined, 
@@ -8,7 +8,9 @@ import {
   EyeOutlined,
   CodeOutlined,
   CheckCircleOutlined,
-  ExclamationCircleOutlined
+  ExclamationCircleOutlined,
+  WarningOutlined,
+  InfoCircleOutlined
 } from '@ant-design/icons'
 import Form from '@rjsf/antd'
 import validator from '@rjsf/validator-ajv8'
@@ -36,9 +38,13 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
   const [formData, setFormData] = useState<ArmbianConfiguration | null>(null)
   const [isValid, setIsValid] = useState(true)
   const [errors, setErrors] = useState<any[]>([])
+  const [warnings, setWarnings] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [previewMode, setPreviewMode] = useState(false)
   const [activeTab, setActiveTab] = useState('form')
+  const [lastSaved, setLastSaved] = useState<Date | null>(null)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
   // Load Armbian schema from our schemas directory
   useEffect(() => {
@@ -177,19 +183,111 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
     loadSchema()
   }, [initialConfig])
 
+  // Custom validation logic
+  const validateConfiguration = useCallback((data: ArmbianConfiguration | null) => {
+    const newWarnings: string[] = []
+    
+    if (data) {
+      // Check for common configuration issues
+      if (!data.board || !data.board.name) {
+        newWarnings.push('No target board selected - this will prevent image generation')
+      }
+      
+      // Check for weak user passwords
+      if (data.users && data.users.length > 0) {
+        const hasWeakPassword = data.users.some(user => 
+          !user.password || user.password.length < 8
+        )
+        if (hasWeakPassword) {
+          newWarnings.push('Weak or empty passwords are not recommended for security')
+        }
+      }
+      
+      // Check large package count
+      if (data.packages?.install && data.packages.install.length > 50) {
+        newWarnings.push('Large package count may significantly increase build time')
+      }
+      
+      // Check swap size
+      if (data.storage?.swapSize && data.storage.swapSize > 2048) {
+        newWarnings.push('Large swap size may reduce image performance on low-memory devices')
+      }
+      
+      // Check WiFi configuration
+      if (data.network?.wifi?.enabled && (!data.network.wifi.ssid || !data.network.wifi.psk)) {
+        newWarnings.push('WiFi is enabled but missing SSID or PSK credentials')
+      }
+      
+      // Check SSH configuration
+      if (data.ssh?.enabled && data.ssh.passwordAuth && data.ssh.rootLogin) {
+        newWarnings.push('Root login with password authentication is a security risk')
+      }
+      
+      // Check for missing essential configuration
+      if (!data.distribution) {
+        newWarnings.push('No distribution selected - this is required for image generation')
+      }
+    }
+    
+    return newWarnings
+  }, [])
+
   const handleFormChange = useCallback((event: IChangeEvent<ArmbianConfiguration>) => {
-    setFormData(event.formData || null)
+    const newFormData = event.formData || null
+    setFormData(newFormData)
     setErrors(event.errors || [])
+    setHasUnsavedChanges(true)
+    
+    // Run custom validation
+    const customWarnings = validateConfiguration(newFormData)
+    setWarnings(customWarnings)
+    
     const valid = !event.errors || event.errors.length === 0
     setIsValid(valid)
     onValidationChange?.(valid, event.errors || [])
-  }, [onValidationChange])
+  }, [onValidationChange, validateConfiguration])
 
-  const handleSave = useCallback(() => {
-    if (formData && isValid) {
-      onSave?.(formData)
+  const handleSave = useCallback(async () => {
+    if (!formData || !isValid) {
+      notification.error({
+        message: 'Save Failed',
+        description: 'Cannot save invalid configuration. Please fix all errors first.',
+        duration: 4
+      })
+      return
     }
-  }, [formData, isValid, onSave])
+
+    setSaving(true)
+    try {
+      await onSave?.(formData)
+      setLastSaved(new Date())
+      setHasUnsavedChanges(false)
+      
+      notification.success({
+        message: 'Configuration Saved',
+        description: `Configuration saved successfully at ${new Date().toLocaleTimeString()}`,
+        duration: 3
+      })
+      
+      // Show warnings if any
+      if (warnings.length > 0) {
+        notification.warning({
+          message: 'Configuration Warnings',
+          description: `Saved with ${warnings.length} warning(s). Check the warnings below.`,
+          duration: 5
+        })
+      }
+    } catch (error) {
+      notification.error({
+        message: 'Save Failed',
+        description: 'Failed to save configuration. Please try again.',
+        duration: 4
+      })
+      console.error('Save error:', error)
+    } finally {
+      setSaving(false)
+    }
+  }, [formData, isValid, onSave, warnings])
 
   const handleExport = useCallback(() => {
     if (formData) {
@@ -269,21 +367,46 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
               Armbian Configuration Editor
             </Title>
             <Space>
-              <Text type="secondary">
-                {isValid ? (
-                  <><CheckCircleOutlined className="text-green-500 mr-1" />Valid Configuration</>
-                ) : (
-                  <><ExclamationCircleOutlined className="text-red-500 mr-1" />{errors.length} Error(s)</>
+              {/* Validation Status */}
+              <Space direction="vertical" size={0}>
+                <Text type="secondary">
+                  {isValid ? (
+                    <><CheckCircleOutlined className="text-green-500 mr-1" />Valid Configuration</>
+                  ) : (
+                    <><ExclamationCircleOutlined className="text-red-500 mr-1" />{errors.length} Error(s)</>
+                  )}
+                </Text>
+                {warnings.length > 0 && (
+                  <Tooltip title={warnings.join('; ')}>
+                    <Text type="warning" className="text-xs">
+                      <WarningOutlined className="mr-1" />
+                      {warnings.length} Warning(s)
+                    </Text>
+                  </Tooltip>
                 )}
-              </Text>
-              <Switch
-                checkedChildren={<EyeOutlined />}
-                unCheckedChildren={<CodeOutlined />}
-                checked={previewMode}
-                onChange={setPreviewMode}
-                disabled={readonly}
-              />
-              <Text type="secondary">Preview Mode</Text>
+              </Space>
+              
+              {/* Save Status */}
+              {lastSaved && (
+                <Tooltip title={`Last saved: ${lastSaved.toLocaleString()}`}>
+                  <Text type="secondary" className="text-xs">
+                    <InfoCircleOutlined className="mr-1" />
+                    {hasUnsavedChanges ? 'Unsaved changes' : 'Saved'}
+                  </Text>
+                </Tooltip>
+              )}
+              
+              {/* Preview Mode Toggle */}
+              <Space>
+                <Switch
+                  checkedChildren={<EyeOutlined />}
+                  unCheckedChildren={<CodeOutlined />}
+                  checked={previewMode}
+                  onChange={setPreviewMode}
+                  disabled={readonly}
+                />
+                <Text type="secondary">Preview Mode</Text>
+              </Space>
             </Space>
           </div>
           <Space>
@@ -307,14 +430,17 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
             >
               Reset
             </Button>
-            <Button 
-              type="primary" 
-              icon={<SaveOutlined />} 
-              onClick={handleSave}
-              disabled={!isValid || readonly}
-            >
-              Save Configuration
-            </Button>
+            <Badge count={warnings.length} size="small" color="orange">
+              <Button 
+                type="primary" 
+                icon={<SaveOutlined />} 
+                onClick={handleSave}
+                loading={saving}
+                disabled={!isValid || readonly || saving}
+              >
+                {saving ? 'Saving...' : 'Save Configuration'}
+              </Button>
+            </Badge>
           </Space>
         </div>
       </div>

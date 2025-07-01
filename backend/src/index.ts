@@ -11,18 +11,21 @@ import dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
+const PORT = parseInt(process.env.PORT || '3001', 10);
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const HOST = process.env.HOST || 'localhost';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+const CORS_ORIGINS = process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000', 'http://localhost:3002'];
+
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: CORS_ORIGINS,
     methods: ['GET', 'POST'],
     credentials: true
   }
 });
-
-const PORT = process.env.PORT || 3001;
-const NODE_ENV = process.env.NODE_ENV || 'development';
 
 // Security middleware
 app.use(helmet({
@@ -39,7 +42,7 @@ app.use(helmet({
 
 // CORS
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: CORS_ORIGINS,
   credentials: true
 }));
 

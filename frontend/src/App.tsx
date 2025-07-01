@@ -152,6 +152,7 @@ const App: React.FC<AppProps> = ({ theme: appTheme = 'light' }) => {
       case 'BuildStatusPanel':
         return (
           <BuildStatusPanel
+            builds={buildStatuses}
             onViewLogs={(buildId) => {
               console.log('View logs for:', buildId)
               // Emit request for build logs
@@ -166,6 +167,11 @@ const App: React.FC<AppProps> = ({ theme: appTheme = 'light' }) => {
               console.log('Cancel build:', buildId)
               // Emit build cancellation request
               emit('build:cancel', { buildId })
+            }}
+            onRefresh={() => {
+              console.log('Refreshing build status...')
+              // Emit request for latest build status
+              emit('build:refresh')
             }}
           />
         )

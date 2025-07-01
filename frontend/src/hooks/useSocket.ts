@@ -24,7 +24,7 @@ interface UseSocketOptions {
 }
 
 export const useSocket = (options: UseSocketOptions = {}) => {
-  const { autoConnect = true, onBuildUpdate, onStatusChange } = options;
+  const { autoConnect = true } = options;
   
   const [state, setState] = useState<SocketState>({
     socket: null,
@@ -64,7 +64,7 @@ export const useSocket = (options: UseSocketOptions = {}) => {
         connecting: false,
         error: null
       }));
-      optionsRef.current.onStatusChange?.('connected');
+      options.onStatusChange?.('connected');
     });
     
     socket.on('disconnect', (reason) => {
@@ -75,7 +75,7 @@ export const useSocket = (options: UseSocketOptions = {}) => {
         connecting: false,
         error: null
       }));
-      optionsRef.current.onStatusChange?.('disconnected');
+      options.onStatusChange?.('disconnected');
     });
     
     socket.on('connect_error', (error) => {
@@ -86,13 +86,13 @@ export const useSocket = (options: UseSocketOptions = {}) => {
         connecting: false,
         error: error.message || 'Connection failed'
       }));
-      optionsRef.current.onStatusChange?.('error', error.message);
+      options.onStatusChange?.('error', error.message);
     });
     
     // Build status updates
     socket.on('build:status', (buildData: BuildStatus) => {
       console.log('🏗️ Build update received:', buildData);
-      optionsRef.current.onBuildUpdate?.(buildData);
+      options.onBuildUpdate?.(buildData);
     });
     
     // System status updates

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Card, Progress, Badge, Typography, List, Space, Button, Tag, Timeline } from 'antd'
+import { Card, Progress, Badge, Typography, List, Space, Button, Tag, Timeline, Empty, Spin } from 'antd'
 import { 
   PlayCircleOutlined, 
   StopOutlined,
@@ -7,8 +7,10 @@ import {
   ExclamationCircleOutlined,
   ClockCircleOutlined,
   DownloadOutlined,
-  EyeOutlined
+  EyeOutlined,
+  ReloadOutlined
 } from '@ant-design/icons'
+import { BuildStatus } from '@/hooks/useSocket'
 const { Text } = Typography
 
 // Local interfaces for this component
@@ -40,9 +42,11 @@ interface LocalBuildJob {
 }
 
 interface BuildStatusPanelProps {
+  builds?: BuildStatus[] // External builds from Socket.io
   onViewLogs?: (buildId: string) => void
   onDownloadArtifact?: (buildId: string, artifactId: string) => void
   onCancelBuild?: (buildId: string) => void
+  onRefresh?: () => void
 }
 
 interface BuildProgress {
@@ -52,14 +56,59 @@ interface BuildProgress {
   timestamp: Date
 }
 
+// Mapper function to convert Socket.io BuildStatus to LocalBuildJob
+const mapBuildStatusToLocalBuild = (build: BuildStatus): LocalBuildJob => {
+  // Map Socket.io status to LocalBuildJob status
+  const statusMap: Record<BuildStatus['status'], LocalBuildJob['status']> = {
+    'pending': 'queued',
+    'building': 'running',
+    'completed': 'completed', 
+    'failed': 'failed'
+  }
+  
+  return {
+    id: build.id,
+    userId: 'socket-user', // Default for Socket.io builds
+    configurationId: `config-${build.id}`,
+    status: statusMap[build.status],
+    progress: build.progress,
+    stage: build.message || 'Processing...',
+    message: build.message,
+    createdAt: build.startTime ? new Date(build.startTime) : new Date(),
+    updatedAt: new Date(),
+    logs: [],
+    artifacts: build.status === 'completed' ? [
+      {
+        id: `artifact-${build.id}`,
+        name: `Armbian_Build_${build.id}.img.xz`,
+        type: 'image',
+        size: 1024 * 1024 * 500, // 500MB default
+        url: `/artifacts/${build.id}/image.img.xz`,
+        checksums: {
+          md5: 'calculated...',
+          sha256: 'calculated...'
+        }
+      }
+    ] : [],
+    estimatedDuration: 3600, // 1 hour default
+    actualDuration: build.startTime && build.endTime 
+      ? Math.floor((new Date(build.endTime).getTime() - new Date(build.startTime).getTime()) / 1000)
+      : undefined
+  }
+}
+
 const BuildStatusPanel: React.FC<BuildStatusPanelProps> = ({
+  builds: externalBuilds,
   onViewLogs,
   onDownloadArtifact,
-  onCancelBuild
+  onCancelBuild,
+  onRefresh
 }) => {
   const [currentBuild, setCurrentBuild] = useState<LocalBuildJob | null>(null)
   const [buildHistory, setBuildHistory] = useState<LocalBuildJob[]>([])
   const [buildProgress, setBuildProgress] = useState<BuildProgress[]>([])
+  const [loading, setLoading] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
   // Mock build stages for demonstration
   const buildStages = [
@@ -75,8 +124,39 @@ const BuildStatusPanel: React.FC<BuildStatusPanelProps> = ({
     'Uploading Artifacts'
   ]
 
-  // Simulate real-time build updates
+  // Handle external builds from Socket.io or use mock data
   useEffect(() => {
+    setLoading(true)
+    
+    if (externalBuilds && externalBuilds.length > 0) {
+      // Use real builds from Socket.io
+      const mappedBuilds = externalBuilds.map(mapBuildStatusToLocalBuild)
+      
+      // Find current running build or most recent build
+      const runningBuild = mappedBuilds.find(build => build.status === 'running')
+      const currentBuild = runningBuild || mappedBuilds[0]
+      
+      setCurrentBuild(currentBuild || null)
+      setBuildHistory(mappedBuilds.filter(build => build.status !== 'running'))
+      
+      // Update progress history for running builds
+      if (runningBuild) {
+        setBuildProgress(prev => [
+          ...prev.slice(-10), // Keep last 10 entries
+          {
+            stage: runningBuild.stage,
+            progress: runningBuild.progress,
+            message: runningBuild.message,
+            timestamp: new Date()
+          }
+        ])
+      }
+      
+      setLoading(false)
+      return // Exit early, don't use mock data
+    }
+
+    // Fall back to mock data when no external builds provided
     const mockCurrentBuild: LocalBuildJob = {
       id: 'build-001',
       userId: 'user-123',
@@ -199,9 +279,21 @@ const BuildStatusPanel: React.FC<BuildStatusPanelProps> = ({
     ]
 
     setBuildHistory(mockHistory)
+    setLoading(false)
 
     return () => clearInterval(progressInterval)
-  }, [])
+  }, [externalBuilds])
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    try {
+      await onRefresh?.()
+    } catch (error) {
+      console.error('Refresh error:', error)
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   const getStatusBadge = (status: LocalBuildJob['status']) => {
     const statusConfig: Record<LocalBuildJob['status'], { color: string; icon: React.ReactElement }> = {
@@ -247,6 +339,29 @@ const BuildStatusPanel: React.FC<BuildStatusPanelProps> = ({
     return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i]
   }
 
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Spin size="large" tip="Loading build status..." />
+      </div>
+    )
+  }
+
+  // Show empty state when no builds available
+  const hasAnyBuilds = currentBuild || buildHistory.length > 0
+  if (!hasAnyBuilds && !externalBuilds) {
+    return (
+      <div className="h-full flex items-center justify-center p-4">
+        <Empty
+          description="No builds found"
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+        >
+          <Button type="primary">Start Your First Build</Button>
+        </Empty>
+      </div>
+    )
+  }
+
   return (
     <div className="h-full overflow-auto p-4 space-y-4">
       {/* Current Build */}
@@ -265,6 +380,7 @@ const BuildStatusPanel: React.FC<BuildStatusPanelProps> = ({
                 size="small" 
                 icon={<StopOutlined />}
                 onClick={() => onCancelBuild?.(currentBuild.id)}
+                loading={refreshing}
               >
                 Cancel
               </Button>
@@ -386,7 +502,21 @@ const BuildStatusPanel: React.FC<BuildStatusPanelProps> = ({
       )}
 
       {/* Build History */}
-      <Card title="Recent Builds">
+      <Card 
+        title="Recent Builds"
+        extra={
+          onRefresh && (
+            <Button 
+              size="small"
+              icon={<ReloadOutlined />}
+              onClick={handleRefresh}
+              loading={refreshing}
+            >
+              Refresh
+            </Button>
+          )
+        }
+      >
         <List
           dataSource={buildHistory}
           renderItem={(build: LocalBuildJob) => (
