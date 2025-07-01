@@ -10,6 +10,7 @@ import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs/promises';
+import ArmbianBuilder, { ArmbianConfiguration, BuildArtifact, BuildProgress } from './services/armbianBuilder.js';
 
 // Load environment variables
 dotenv.config();
@@ -34,8 +35,9 @@ interface BuildJob {
   artifacts?: Array<{
     id: string;
     name: string;
-    type: 'image' | 'log' | 'config' | 'checksum';
+    type: 'image' | 'log' | 'config' | 'checksum' | 'packages';
     size: number;
+    path: string;
     url: string;
   }>;
   logs: string[];
@@ -54,6 +56,9 @@ const buildQueue: BuildQueue = {
   activeJobs: new Set(),
   queuedJobs: []
 };
+
+// Initialize Armbian builder
+const armbianBuilder = new ArmbianBuilder();
 
 const app = express();
 const httpServer = createServer(app);
@@ -276,32 +281,68 @@ app.get('/api/builds/:buildId/logs', (req: express.Request, res: express.Respons
   });
 });
 
-app.get('/api/builds/:buildId/artifacts/:artifactId', async (req: express.Request, res: express.Response) => {
-  const { buildId, artifactId } = req.params;
+app.get('/api/builds/:buildId/artifacts/:filename', async (req: express.Request, res: express.Response) => {
+  const { buildId, filename } = req.params;
   const job = buildQueue.jobs.get(buildId);
   
   if (!job) {
     return res.status(404).json({ error: 'Build job not found' });
   }
   
-  const artifact = job.artifacts?.find(a => a.id === artifactId);
+  const artifact = job.artifacts?.find(a => a.name === filename);
   if (!artifact) {
     return res.status(404).json({ error: 'Artifact not found' });
   }
   
   try {
-    // In a real implementation, this would serve the actual file
-    // For demo purposes, we'll return metadata
-    res.json({
-      message: 'Artifact download would start here',
-      artifact: artifact,
-      downloadUrl: `/download/${buildId}/${artifactId}`
+    // Check if the artifact has a file path
+    if (!artifact.path) {
+      return res.json({
+        message: 'Artifact metadata (no file to download)',
+        artifact: artifact
+      });
+    }
+
+    // Check if file exists
+    try {
+      await fs.access(artifact.path);
+    } catch {
+      return res.status(404).json({ error: 'Artifact file not found on disk' });
+    }
+    
+    // Set appropriate headers
+    res.setHeader('Content-Type', getContentType(artifact.type));
+    res.setHeader('Content-Length', artifact.size);
+    res.setHeader('Content-Disposition', `attachment; filename="${artifact.name}"`);
+    
+    // Stream the file
+    const fileStream = require('fs').createReadStream(artifact.path);
+    fileStream.pipe(res);
+    
+    fileStream.on('error', (error: Error) => {
+      console.error('Error streaming file:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Error serving file' });
+      }
     });
+    
   } catch (error) {
     console.error('❌ Failed to serve artifact:', error);
     res.status(500).json({ error: 'Failed to serve artifact' });
   }
 });
+
+// Helper function to get content type
+function getContentType(artifactType: string): string {
+  switch (artifactType) {
+    case 'image': return 'application/octet-stream';
+    case 'log': return 'text/plain';
+    case 'config': return 'application/json';
+    case 'checksum': return 'text/plain';
+    case 'packages': return 'text/plain';
+    default: return 'application/octet-stream';
+  }
+}
 
 // Build processing functions
 async function processNextBuild() {
@@ -316,85 +357,79 @@ async function processNextBuild() {
   if (!job) return;
   
   buildQueue.activeJobs.add(buildId);
-  await simulateBuildProcess(job);
+  await executeBuildProcess(job);
 }
 
-async function simulateBuildProcess(job: BuildJob) {
-  const buildSteps = [
-    { status: 'initializing' as const, message: 'Initializing build environment...', duration: 2000 },
-    { status: 'downloading' as const, message: 'Downloading base images and packages...', duration: 5000 },
-    { status: 'building' as const, message: 'Building Armbian image...', duration: 10000 },
-    { status: 'packaging' as const, message: 'Packaging and compressing image...', duration: 3000 },
-    { status: 'uploading' as const, message: 'Uploading artifacts...', duration: 2000 }
-  ];
-
+async function executeBuildProcess(job: BuildJob) {
   try {
+    console.log(`🚀 Starting build process for job ${job.id}`);
     job.startedAt = new Date().toISOString();
     
-    for (let i = 0; i < buildSteps.length; i++) {
-      const step = buildSteps[i];
-      
-      // Check if job was cancelled
-      if (job.status === 'cancelled') {
-        return;
-      }
-      
-      // Update job status
-      job.status = step.status;
-      job.message = step.message;
-      job.progress = Math.round(((i + 1) / (buildSteps.length + 1)) * 100);
-      
-      // Add log entry
-      job.logs.push(`[${new Date().toISOString()}] ${step.message}`);
-      
-      // Emit progress update
-      io.emit('build:progress', {
+    // Generate build configuration
+    job.status = 'initializing';
+    job.message = 'Generating build configuration...';
+    job.logs.push(`[${new Date().toISOString()}] ${job.message}`);
+    
+    io.emit('build:update', {
+      id: job.id,
+      status: job.status,
+      progress: 5,
+      message: job.message,
+      timestamp: new Date().toISOString()
+    });
+
+    const configDir = await armbianBuilder.generateBuildConfig(job.configuration as ArmbianConfiguration, job.id);
+    job.logs.push(`[${new Date().toISOString()}] Build configuration generated at ${configDir}`);
+
+    // Execute the build
+    const onProgress = (progress: BuildProgress) => {
+      // Map build phases to job status
+      const statusMap: Record<string, BuildJob['status']> = {
+        'initializing': 'initializing',
+        'downloading': 'downloading', 
+        'building': 'building',
+        'packaging': 'packaging',
+        'uploading': 'uploading',
+        'completed': 'completed'
+      };
+
+      job.status = statusMap[progress.phase] || 'building';
+      job.progress = progress.progress;
+      job.message = progress.message;
+      job.logs.push(`[${progress.timestamp}] ${progress.message}`);
+
+      // Emit real-time updates
+      io.emit('build:update', {
         id: job.id,
         status: job.status,
         progress: job.progress,
         message: job.message,
-        timestamp: new Date().toISOString()
+        timestamp: progress.timestamp
       });
-      
-      // Simulate work
-      await new Promise(resolve => setTimeout(resolve, step.duration));
-    }
+    };
+
+    // Execute the build
+    const artifacts = await armbianBuilder.executeBuild(configDir, job.id, onProgress);
     
     // Complete the build
     job.status = 'completed';
     job.progress = 100;
     job.message = 'Build completed successfully';
     job.completedAt = new Date().toISOString();
-    
-    // Add artifacts
-    job.artifacts = [
-      {
-        id: uuidv4(),
-        name: `armbian-${job.configuration.board?.name || 'unknown'}-${job.configuration.distribution?.release || 'bookworm'}.img`,
-        type: 'image',
-        size: 1024 * 1024 * 1024 * 2.5, // 2.5GB
-        url: `/api/builds/${job.id}/artifacts/image`
-      },
-      {
-        id: uuidv4(),
-        name: 'build.log',
-        type: 'log',
-        size: 1024 * 256, // 256KB
-        url: `/api/builds/${job.id}/artifacts/log`
-      },
-      {
-        id: uuidv4(),
-        name: 'armbian-config.json',
-        type: 'config',
-        size: 1024 * 4, // 4KB
-        url: `/api/builds/${job.id}/artifacts/config`
-      }
-    ];
+    job.artifacts = artifacts;
     
     job.logs.push(`[${new Date().toISOString()}] Build completed successfully`);
-    job.logs.push(`[${new Date().toISOString()}] Generated ${job.artifacts.length} artifacts`);
+    job.logs.push(`[${new Date().toISOString()}] Generated ${artifacts.length} artifacts`);
     
     // Emit completion
+    io.emit('build:update', {
+      id: job.id,
+      status: job.status,
+      progress: job.progress,
+      message: job.message,
+      timestamp: job.completedAt
+    });
+    
     io.emit('build:completed', {
       id: job.id,
       status: job.status,
@@ -410,6 +445,16 @@ async function simulateBuildProcess(job: BuildJob) {
     job.message = `Build failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
     job.completedAt = new Date().toISOString();
     job.logs.push(`[${new Date().toISOString()}] Build failed: ${job.message}`);
+    
+    console.error(`❌ Build ${job.id} failed:`, error);
+    
+    io.emit('build:update', {
+      id: job.id,
+      status: job.status,
+      progress: job.progress,
+      message: job.message,
+      timestamp: job.completedAt
+    });
     
     io.emit('build:failed', {
       id: job.id,
@@ -550,14 +595,65 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Legacy event handlers for backward compatibility
-  socket.on('build:start', (data) => {
-    console.log('🚀 Legacy build start event:', data);
-    socket.emit('build:status', {
-      type: 'started',
-      timestamp: new Date().toISOString(),
-      ...data
-    });
+  // Handle build start requests from frontend
+  socket.on('build:start', async (data) => {
+    console.log('🚀 Build start requested from frontend:', data);
+    
+    try {
+      const { config, userId = 'default-user' } = data;
+      
+      if (!config) {
+        socket.emit('build:error', {
+          error: 'Configuration is required',
+          timestamp: new Date().toISOString()
+        });
+        return;
+      }
+
+      const buildJob: BuildJob = {
+        id: uuidv4(),
+        configurationId: config.id || uuidv4(),
+        userId,
+        status: 'queued',
+        progress: 0,
+        message: 'Build job queued',
+        createdAt: new Date().toISOString(),
+        logs: [`[${new Date().toISOString()}] Build job created for configuration: ${config.name || 'Unknown'}`],
+        configuration: config
+      };
+
+      buildQueue.jobs.set(buildJob.id, buildJob);
+      buildQueue.queuedJobs.push(buildJob.id);
+
+      // Respond to submitter with build ID
+      socket.emit('build:update', {
+        id: buildJob.id,
+        status: buildJob.status,
+        progress: buildJob.progress,
+        message: buildJob.message,
+        timestamp: buildJob.createdAt
+      });
+
+      // Broadcast to all clients
+      io.emit('build:created', {
+        id: buildJob.id,
+        status: buildJob.status,
+        message: buildJob.message,
+        timestamp: buildJob.createdAt
+      });
+
+      // Start processing if no active jobs
+      if (buildQueue.activeJobs.size === 0) {
+        processNextBuild();
+      }
+
+    } catch (error) {
+      console.error('❌ Build start failed:', error);
+      socket.emit('build:error', {
+        error: 'Failed to start build job',
+        timestamp: new Date().toISOString()
+      });
+    }
   });
 
   socket.on('build:progress', (data) => {

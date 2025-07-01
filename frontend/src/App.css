@@ -7,38 +7,54 @@
 /* Design system CSS variables */
 :root {
   /* Colors - Harmonious blue-gray palette */
-  --color-primary-50: #f8fafc;
-  --color-primary-500: #64748b;
-  --color-primary-900: #0f172a;
-  --color-accent-50: #eff6ff;
-  --color-accent-500: #3b82f6;
-  --color-accent-600: #2563eb;
-  
+  --color-primary-50: #f6f8fa;
+  --color-primary-100: #e9eef5;
+  --color-primary-200: #dbe3ec;
+  --color-primary-300: #c2cfe0;
+  --color-primary-400: #a3b8cc;
+  --color-primary-500: #7b93b2;
+  --color-primary-600: #5a6d8a;
+  --color-primary-700: #3d4c5e;
+  --color-primary-800: #273142;
+  --color-primary-900: #181d23;
+
+  --color-accent-50: #eaf3ff;
+  --color-accent-100: #d0e4ff;
+  --color-accent-200: #a6caff;
+  --color-accent-300: #7bb0ff;
+  --color-accent-400: #5396fa;
+  --color-accent-500: #3578e5;
+  --color-accent-600: #205ec7;
+  --color-accent-700: #174a9c;
+  --color-accent-800: #153c7a;
+  --color-accent-900: #122e5a;
+
   --color-success: #22c55e;
   --color-warning: #f59e0b;
   --color-error: #ef4444;
-  
+
   --color-bg-primary: #ffffff;
-  --color-bg-secondary: #f8fafc;
-  --color-bg-tertiary: #f1f5f9;
-  
-  --color-text-primary: #0f172a;
-  --color-text-secondary: #475569;
-  --color-text-muted: #94a3b8;
-  
-  --color-border-light: #e2e8f0;
-  --color-border-default: #cbd5e1;
-  
+  --color-bg-secondary: #f6f8fa;
+  --color-bg-tertiary: #e9eef5;
+
+  --color-text-primary: #273142;
+  --color-text-secondary: #5a6d8a;
+  --color-text-tertiary: #7b93b2;
+  --color-text-muted: #a3b8cc;
+
+  --color-border-light: #f3f5f7;
+  --color-border-default: #e9eef5;
+
   /* Typography */
   --font-family-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-family-mono: 'JetBrains Mono', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-  
+
   --font-size-xs: 0.75rem;
   --font-size-sm: 0.875rem;
   --font-size-base: 1rem;
   --font-size-lg: 1.125rem;
   --font-size-xl: 1.25rem;
-  
+
   /* Spacing */
   --spacing-xs: 0.25rem;
   --spacing-sm: 0.5rem;
@@ -46,13 +62,13 @@
   --spacing-lg: 1rem;
   --spacing-xl: 1.5rem;
   --spacing-2xl: 2rem;
-  
+
   /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-base: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  
+  --shadow-sm: 0 1px 2px 0 rgba(23, 29, 35, 0.04);
+  --shadow-base: 0 1px 3px 0 rgba(23, 29, 35, 0.08), 0 1px 2px 0 rgba(23, 29, 35, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(23, 29, 35, 0.08), 0 2px 4px -1px rgba(23, 29, 35, 0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(23, 29, 35, 0.10), 0 4px 6px -2px rgba(23, 29, 35, 0.05);
+
   /* Border radius */
   --radius-sm: 0.125rem;
   --radius-base: 0.375rem;
@@ -181,9 +197,10 @@ body {
 .ant-textarea {
   border-radius: var(--radius-base) !important;
   border-color: var(--color-border-default) !important;
+  border-width: 1px !important;
   font-family: var(--font-family-sans) !important;
   transition: all 0.2s ease !important;
-  box-shadow: var(--shadow-sm) !important;
+  box-shadow: none !important;
 }
 
 .ant-input:focus,
@@ -194,8 +211,8 @@ body {
 .ant-select-selector:hover,
 .ant-input-number:hover,
 .ant-textarea:hover {
-  border-color: var(--color-accent-500) !important;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1) !important;
+  border-color: var(--color-accent-100) !important;
+  box-shadow: 0 0 0 2px rgba(53, 120, 229, 0.04) !important;
 }
 
 .ant-btn {
@@ -245,7 +262,8 @@ body {
 .ant-card {
   border-radius: var(--radius-lg) !important;
   border-color: var(--color-border-light) !important;
-  box-shadow: var(--shadow-sm) !important;
+  border-width: 1px !important;
+  box-shadow: none !important;
   background-color: var(--color-bg-primary) !important;
 }
 
@@ -254,6 +272,7 @@ body {
   border-bottom: 1px solid var(--color-border-light) !important;
   border-radius: var(--radius-lg) var(--radius-lg) 0 0 !important;
   padding: var(--spacing-lg) var(--spacing-xl) !important;
+  box-shadow: none !important;
 }
 
 .ant-card-head-title {
@@ -331,6 +350,9 @@ body {
   overflow: auto;
   background: var(--color-bg-primary);
   font-family: var(--font-family-sans);
+  border-color: var(--color-border-light) !important;
+  border-width: 1px !important;
+  box-shadow: none !important;
 }
 
 .bbos-panel-header {
@@ -339,7 +361,8 @@ body {
   justify-content: space-between;
   margin-bottom: var(--spacing-xl);
   padding-bottom: var(--spacing-lg);
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--color-border-light) !important;
+  box-shadow: none !important;
 }
 
 .bbos-panel-title {
@@ -425,32 +448,10 @@ body {
   overflow: auto;
 }
 
-/* ArmbianConfigEditor specific styling with high specificity */
-.bbos-config-editor-wrapper,
-.bbos-config-editor-wrapper * {
-  background-color: inherit !important;
-  color: inherit !important;
-}
-
-.bbos-config-editor-wrapper .ant-card {
-  background-color: var(--color-bg-primary) !important;
-  border-color: var(--color-border-light) !important;
-  color: var(--color-text-primary) !important;
-}
-
-.bbos-config-editor-wrapper .ant-typography {
-  color: inherit !important;
-}
-
-.bbos-config-editor-wrapper .ant-btn-primary {
-  background-color: var(--color-accent-500) !important;
-  border-color: var(--color-accent-500) !important;
-  color: white !important;
-}
-
 /* RJSF Form Styling */
 .bbos-rjsf-form {
   font-family: var(--font-family-sans) !important;
+  padding: var(--spacing-xl) !important;
 }
 
 .bbos-rjsf-form .ant-form-item {
@@ -474,6 +475,8 @@ body {
 .bbos-rjsf-form .ant-checkbox-wrapper,
 .bbos-rjsf-form .ant-radio-wrapper {
   border-radius: var(--radius-base) !important;
+  border-color: var(--color-border-default) !important;
+  border-width: 1px !important;
   transition: all 0.2s ease !important;
 }
 
@@ -486,7 +489,7 @@ body {
 
 .bbos-rjsf-form .ant-form-item-has-error .ant-input,
 .bbos-rjsf-form .ant-form-item-has-error .ant-select-selector {
-  border-color: var(--color-error) !important;
+  border-color: #f8d7da !important;
 }
 
 .bbos-rjsf-form .ant-form-item-explain-error {
@@ -511,11 +514,12 @@ body {
 
 /* RJSF Array field styling */
 .bbos-rjsf-form .array-item {
-  background: var(--color-bg-tertiary) !important;
+  background: var(--color-bg-secondary) !important;
   border: 1px solid var(--color-border-light) !important;
   border-radius: var(--radius-md) !important;
   padding: var(--spacing-lg) !important;
   margin-bottom: var(--spacing-md) !important;
+  box-shadow: none !important;
 }
 
 .bbos-rjsf-form .array-item-remove {
@@ -529,15 +533,17 @@ body {
   border-radius: var(--radius-md) !important;
   padding: var(--spacing-lg) !important;
   margin-bottom: var(--spacing-lg) !important;
+  box-shadow: none !important;
 }
 
 /* Error list styling */
 .bbos-rjsf-form .error-list {
-  background: var(--color-bg-secondary) !important;
-  border: 1px solid var(--color-error) !important;
+  background: #fff6f6 !important;
+  border: 1px solid #f8d7da !important;
   border-radius: var(--radius-md) !important;
   padding: var(--spacing-lg) !important;
   margin-bottom: var(--spacing-xl) !important;
+  box-shadow: none !important;
 }
 
 .bbos-rjsf-form .error-list li {
@@ -553,11 +559,12 @@ body {
 
 .bbos-build-item {
   padding: var(--spacing-lg);
-  border: 1px solid var(--color-border-light);
+  border: 1px solid var(--color-border-light) !important;
   border-radius: var(--radius-md);
   margin-bottom: var(--spacing-lg);
   transition: all 0.2s ease;
   background: var(--color-bg-primary);
+  box-shadow: none !important;
 }
 
 .bbos-build-item:hover {
@@ -615,21 +622,22 @@ body {
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
+  background: var(--color-bg-tertiary);
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-tertiary);
   border-radius: var(--radius-base);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border-default);
+  background: var(--color-border-light);
   border-radius: var(--radius-base);
   transition: background-color 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-accent-500);
+  background: var(--color-accent-100);
 }
 
 /* Code and Monospace */
@@ -705,16 +713,285 @@ pre {
   }
 }
 
-/* Dark Mode Support (for future implementation) */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-bg-primary: #1e293b;
-    --color-bg-secondary: #0f172a;
-    --color-bg-tertiary: #334155;
-    --color-text-primary: #f8fafc;
-    --color-text-secondary: #cbd5e1;
-    --color-text-muted: #64748b;
-    --color-border-light: #334155;
-    --color-border-default: #475569;
-  }
+/* --- Paper style backgrounds --- */
+body, html, #root, .bbos-panel, .ant-card, .bbos-config-editor-wrapper, .bbos-panel-content {
+  background: var(--color-bg-primary) !important;
+}
+
+.bbos-panel-header, .ant-card-head {
+  background: var(--color-bg-secondary) !important;
+}
+
+.bbos-rjsf-form .object-property, .bbos-rjsf-form .array-item {
+  background: var(--color-bg-secondary) !important;
+}
+
+/* Remove any unnecessary box-shadows or dark outlines */
+.ant-card, .bbos-panel, .bbos-panel-header, .bbos-panel-content {
+  box-shadow: none !important;
+}
+
+/* Make error borders less harsh */
+.bbos-rjsf-form .ant-form-item-has-error .ant-input,
+.bbos-rjsf-form .ant-form-item-has-error .ant-select-selector {
+  border-color: #f8d7da !important;
+}
+
+/* Make error backgrounds lighter */
+.bbos-rjsf-form .error-list {
+  background: #fff6f6 !important;
+  border: 1px solid #f8d7da !important;
+}
+
+/* --- Remove or further soften borders for parent/child nodes in JSON Forms --- */
+.bbos-rjsf-form .object-property,
+.bbos-rjsf-form .array-item {
+  border: none !important;
+  box-shadow: none !important;
+  background: var(--color-bg-secondary) !important;
+}
+
+.bbos-rjsf-form .object-property:focus-within,
+.bbos-rjsf-form .array-item:focus-within,
+.bbos-rjsf-form .object-property:hover,
+.bbos-rjsf-form .array-item:hover {
+  border: 1px solid var(--color-border-default) !important;
+  background: var(--color-bg-primary) !important;
+}
+
+fieldset {
+  border: none !important;
+  background: none !important;
+  box-shadow: none !important;
+  margin-inline: 2px;
+  padding-block: 0.35em 0.625em;
+  padding-inline: 0.75em;
+}
+
+/* --- JSON Form UI/UX Improvements --- */
+.bbos-rjsf-form {
+  font-family: var(--font-family-sans) !important;
+  padding: var(--spacing-xl) !important;
+}
+
+.bbos-rjsf-form .object-property,
+.bbos-rjsf-form .array-item {
+  margin-bottom: var(--spacing-2xl) !important;
+  padding: var(--spacing-xl) !important;
+  background: var(--color-bg-secondary) !important;
+  border-radius: var(--radius-lg) !important;
+  /* border removed by previous rules */
+}
+
+.bbos-rjsf-form .object-property > legend,
+.bbos-rjsf-form .array-item > legend {
+  font-size: 1.35rem !important;
+  font-weight: 800 !important;
+  color: var(--color-accent-700) !important;
+  font-family: var(--font-family-mono), monospace !important;
+  margin-top: var(--spacing-xl) !important;
+  margin-bottom: var(--spacing-md) !important;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, var(--color-accent-100), transparent 80%);
+  padding: 0.15em 0.5em;
+  border-radius: var(--radius-base);
+  display: inline-block;
+}
+
+.bbos-rjsf-form .ant-form-item-label > label {
+  font-size: var(--font-size-xs) !important;
+  font-weight: 500 !important;
+  color: var(--color-text-secondary) !important;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  font-family: var(--font-family-sans) !important;
+}
+
+.bbos-rjsf-form .ant-form-item {
+  margin-bottom: var(--spacing-lg) !important;
+}
+
+/* Extra spacing between groups */
+.bbos-rjsf-form .object-property,
+.bbos-rjsf-form .array-item {
+  margin-top: var(--spacing-xl) !important;
+  margin-bottom: var(--spacing-2xl) !important;
+}
+
+.bbos-rjsf-form .ant-form-item-extra,
+.bbos-rjsf-form .ant-form-item .description {
+  color: var(--color-text-secondary) !important;
+  font-size: var(--font-size-sm) !important;
+  font-style: italic;
+  margin-bottom: var(--spacing-xs) !important;
+}
+
+.bbos-rjsf-form .ant-form-item-has-error .ant-input,
+.bbos-rjsf-form .ant-form-item-has-error .ant-select-selector {
+  background: #fff6f6 !important;
+  border-color: #f8d7da !important;
+}
+
+.bbos-rjsf-form .ant-form-item-has-error .ant-input:focus,
+.bbos-rjsf-form .ant-form-item-has-error .ant-select-selector:focus {
+  box-shadow: 0 0 0 2px #f8d7da !important;
+}
+
+.bbos-rjsf-form .ant-input:focus,
+.bbos-rjsf-form .ant-select-selector:focus,
+.bbos-rjsf-form .ant-input-number:focus {
+  box-shadow: 0 0 0 2px var(--color-accent-100) !important;
+  border-color: var(--color-accent-500) !important;
+}
+
+.bbos-rjsf-form .ant-form-item input:focus,
+.bbos-rjsf-form .ant-form-item select:focus,
+.bbos-rjsf-form .ant-form-item textarea:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-accent-100) !important;
+}
+
+.bbos-rjsf-form .array-item .array-item-add,
+.bbos-rjsf-form .array-item .array-item-remove,
+.bbos-rjsf-form .array-item .array-item-move-up,
+.bbos-rjsf-form .array-item .array-item-move-down,
+.bbos-rjsf-form .array-item .array-item-copy {
+  border-radius: var(--radius-base) !important;
+  background: var(--color-bg-primary) !important;
+  border: 1px solid var(--color-border-default) !important;
+  color: var(--color-accent-600) !important;
+  font-size: var(--font-size-sm) !important;
+  margin-right: var(--spacing-xs) !important;
+  transition: background 0.2s, border 0.2s, color 0.2s;
+}
+
+.bbos-rjsf-form .array-item .array-item-add:hover,
+.bbos-rjsf-form .array-item .array-item-remove:hover,
+.bbos-rjsf-form .array-item .array-item-move-up:hover,
+.bbos-rjsf-form .array-item .array-item-move-down:hover,
+.bbos-rjsf-form .array-item .array-item-copy:hover {
+  background: var(--color-accent-50) !important;
+  border-color: var(--color-accent-500) !important;
+  color: var(--color-accent-700) !important;
+}
+
+.bbos-rjsf-form .object-property:focus-within,
+.bbos-rjsf-form .array-item:focus-within {
+  box-shadow: 0 0 0 2px var(--color-accent-100) !important;
+  background: var(--color-bg-primary) !important;
+}
+
+/* --- Setup Wizard UI/UX Improvements --- */
+.bbos-setup-wizard-step {
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--spacing-2xl) var(--spacing-xl);
+  margin-bottom: var(--spacing-2xl);
+  transition: box-shadow 0.2s, background 0.2s;
+}
+
+.bbos-setup-wizard-step.active {
+  background: var(--color-bg-primary);
+  box-shadow: var(--shadow-md);
+}
+
+.bbos-setup-wizard-title {
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--color-accent-700);
+  font-family: var(--font-family-mono), monospace;
+  margin-bottom: var(--spacing-lg);
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, var(--color-accent-100), transparent 80%);
+  padding: 0.15em 0.5em;
+  border-radius: var(--radius-base);
+  display: inline-block;
+}
+
+.bbos-setup-wizard-description {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-base);
+  font-family: var(--font-family-sans);
+  margin-bottom: var(--spacing-lg);
+}
+
+.bbos-setup-wizard-stepper {
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-xl);
+}
+
+.bbos-setup-wizard-stepper .ant-steps-item-process .ant-steps-item-icon {
+  background: var(--color-accent-500) !important;
+  border-color: var(--color-accent-500) !important;
+}
+
+.bbos-setup-wizard-stepper .ant-steps-item-process .ant-steps-item-title {
+  color: var(--color-accent-700) !important;
+  font-weight: 600 !important;
+}
+
+.bbos-setup-wizard-nav {
+  display: flex;
+  gap: var(--spacing-lg);
+  margin-top: var(--spacing-xl);
+}
+
+.bbos-setup-wizard-nav .ant-btn {
+  flex: 1;
+  height: 48px;
+  font-size: var(--font-size-lg);
+  border-radius: var(--radius-lg);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+  transition: background 0.2s, color 0.2s;
+}
+
+.bbos-setup-wizard-nav .ant-btn-primary {
+  background: linear-gradient(135deg, var(--color-accent-500), var(--color-accent-600));
+  color: #fff;
+  border: none;
+}
+
+.bbos-setup-wizard-nav .ant-btn-primary:disabled {
+  background: var(--color-border-default);
+  color: var(--color-text-muted);
+}
+
+.bbos-setup-wizard-nav .ant-btn-default {
+  background: var(--color-bg-secondary);
+  color: var(--color-accent-600);
+  border: none;
+}
+
+.bbos-setup-wizard-nav .ant-btn-default:disabled {
+  background: var(--color-border-default);
+  color: var(--color-text-muted);
+}
+
+/* --- Step transitions --- */
+.bbos-setup-wizard-step {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.3s, transform 0.3s;
+}
+.bbos-setup-wizard-step-exit {
+  opacity: 0;
+  transform: translateY(16px);
+}
+.bbos-setup-wizard-step-enter {
+  opacity: 0;
+  transform: translateY(-16px);
+}
+.bbos-setup-wizard-step-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+}
+.bbos-setup-wizard-step-exit-active {
+  opacity: 0;
+  transform: translateY(16px);
 } 

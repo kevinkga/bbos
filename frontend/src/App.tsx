@@ -227,77 +227,6 @@ const App: React.FC<AppProps> = ({ theme = 'light' }) => {
           <FileExplorerPanel
             onFileSelect={(file) => {
               console.log('File selected:', file)
-              
-              if (file.type === 'config' && file.content) {
-                // Load configuration into the editor
-                const config = file.content as ArmbianConfiguration
-                setSelectedConfig(config)
-                
-                notification.info({
-                  message: 'Configuration Loaded',
-                  description: `"${file.title}" loaded into the configuration editor`,
-                  placement: 'topRight',
-                  duration: 3
-                })
-                
-                console.log('Loading configuration into editor:', config)
-              } else if (file.type === 'template') {
-                // Load template configuration
-                const templateConfigs = {
-                  'template-minimal': {
-                    id: crypto.randomUUID(),
-                    userId: 'current-user',
-                    name: 'Minimal Server Configuration',
-                    description: 'Basic server setup without desktop environment',
-                    board: { family: 'rockchip', name: 'rock-5b', architecture: 'arm64' },
-                    distribution: { release: 'bookworm', type: 'server' },
-                    ssh: { enabled: true, port: 22, passwordAuth: false, rootLogin: false },
-                    packages: { install: ['wget', 'curl', 'nano', 'htop', 'fail2ban'] },
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                    version: 1
-                  },
-                  'template-desktop': {
-                    id: crypto.randomUUID(),
-                    userId: 'current-user',
-                    name: 'Desktop Environment Configuration',
-                    description: 'Full desktop environment with common applications',
-                    board: { family: 'rockchip', name: 'rock-5b', architecture: 'arm64' },
-                    distribution: { release: 'bookworm', type: 'desktop', desktop: 'xfce' },
-                    ssh: { enabled: true, port: 22, passwordAuth: false, rootLogin: false },
-                    packages: { install: ['firefox-esr', 'libreoffice', 'gimp', 'vlc', 'code'] },
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                    version: 1
-                  },
-                  'template-iot': {
-                    id: crypto.randomUUID(),
-                    userId: 'current-user',
-                    name: 'IoT Gateway Configuration', 
-                    description: 'Optimized for IoT applications and edge computing',
-                    board: { family: 'rockchip', name: 'rock-5b', architecture: 'arm64' },
-                    distribution: { release: 'bookworm', type: 'server' },
-                    ssh: { enabled: true, port: 22, passwordAuth: false, rootLogin: false },
-                    packages: { install: ['docker.io', 'mosquitto', 'node-red', 'influxdb'] },
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                    version: 1
-                  }
-                }
-                
-                const templateConfig = templateConfigs[file.id as keyof typeof templateConfigs]
-                if (templateConfig) {
-                  setSelectedConfig(templateConfig as ArmbianConfiguration)
-                  
-                  notification.info({
-                    message: 'Template Loaded',
-                    description: `Template "${file.title}" loaded. You can modify and save it as a new configuration.`,
-                    placement: 'topRight',
-                    duration: 4
-                  })
-                  console.log('Loading template into editor:', templateConfig)
-                }
-              }
             }}
             onFileCreate={(file) => {
               console.log('File created:', file)
@@ -323,6 +252,43 @@ const App: React.FC<AppProps> = ({ theme = 'light' }) => {
               notification.success({
                 message: 'File Deleted',
                 description: 'File has been deleted successfully',
+                placement: 'topRight'
+              })
+            }}
+            onConfigSelect={(config) => {
+              console.log('Configuration selected:', config)
+              setSelectedConfig(config)
+              
+              notification.info({
+                message: 'Configuration Selected',
+                description: `Selected configuration: ${config.name}`,
+                placement: 'topRight'
+              })
+            }}
+            onBuildSelect={(build) => {
+              console.log('Build selected:', build)
+              
+              notification.info({
+                message: 'Build Selected',
+                description: `Selected build ${build.id} (${build.status})`,
+                placement: 'topRight'
+              })
+            }}
+            onArtifactDownload={(buildId, artifactName) => {
+              console.log('Download artifact:', { buildId, artifactName })
+              
+              // Create download URL and trigger download
+              const downloadUrl = `/api/builds/${buildId}/artifacts/${encodeURIComponent(artifactName)}`
+              const link = document.createElement('a')
+              link.href = downloadUrl
+              link.download = artifactName
+              document.body.appendChild(link)
+              link.click()
+              document.body.removeChild(link)
+              
+              notification.success({
+                message: 'Download Started',
+                description: `Downloading ${artifactName}`,
                 placement: 'topRight'
               })
             }}

@@ -6,6 +6,7 @@ import validator from '@rjsf/validator-ajv8'
 import { RJSFSchema, ErrorSchema, UiSchema } from '@rjsf/utils'
 import { ArmbianConfiguration } from '@/types'
 import { colors, components, spacing } from '@/styles/design-tokens'
+import { useSocket } from '@/hooks/useSocket'
 
 const { Title, Text } = Typography
 const { TabPane } = Tabs
@@ -53,6 +54,36 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
   const [isValid, setIsValid] = useState(true)
   const [errors, setErrors] = useState<ErrorSchema>({})
   const [stepValidation, setStepValidation] = useState<boolean[]>([])
+  const { emit, connected } = useSocket({
+    onBuildUpdate: (build) => {
+      console.log('Build update received:', build);
+      setBuildLog((prev) => prev + `\n[${new Date(build.timestamp).toLocaleTimeString()}] ${build.message}`)
+      setBuildProgress(build.progress || 0)
+      
+      // Map backend status to frontend status
+      const statusMap: Record<string, 'pending' | 'building' | 'completed' | 'failed'> = {
+        'queued': 'pending',
+        'initializing': 'building',
+        'downloading': 'building',
+        'building': 'building', 
+        'packaging': 'building',
+        'uploading': 'building',
+        'completed': 'completed',
+        'failed': 'failed',
+        'cancelled': 'failed'
+      };
+      
+      setBuildStatus(statusMap[build.status] || 'building')
+      
+      if (build.status === 'completed' || build.status === 'failed') {
+        setTimeout(() => setBuildModalOpen(false), 3000)
+      }
+    }
+  });
+  const [buildModalOpen, setBuildModalOpen] = useState(false)
+  const [buildLog, setBuildLog] = useState('')
+  const [buildProgress, setBuildProgress] = useState(0)
+  const [buildStatus, setBuildStatus] = useState<'pending'|'building'|'completed'|'failed'>('pending')
 
   // Update form data when initialConfig changes (when a different configuration is selected)
   useEffect(() => {
@@ -767,11 +798,42 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
     }
   }, [currentStep])
 
+  const jumpToStep = useCallback((targetStep: number) => {
+    // Allow jumping to any previous step or next step if current is valid
+    const currentStepConfig = wizardSteps[currentStep]
+    const isCurrentStepValid = validateCurrentStep(formData, currentStepConfig.schema)
+    const canJump = targetStep <= currentStep || (targetStep === currentStep + 1 && isCurrentStepValid)
+    
+    if (canJump && targetStep >= 0 && targetStep < wizardSteps.length) {
+      setCurrentStep(targetStep)
+    }
+  }, [currentStep, wizardSteps, formData, validateCurrentStep])
+
   const canProceed = useCallback(() => {
     const currentStepConfig = wizardSteps[currentStep]
     const stepData = formData
     return validateCurrentStep(stepData, currentStepConfig.schema)
   }, [currentStep, wizardSteps, formData, validateCurrentStep])
+
+  const getStepStatus = useCallback((stepIndex: number) => {
+    if (stepIndex < currentStep) {
+      return stepValidation[stepIndex] !== false ? 'finish' : 'error'
+    } else if (stepIndex === currentStep) {
+      return 'process'
+    } else {
+      return 'wait'
+    }
+  }, [currentStep, stepValidation])
+
+  // Build handler
+  const handleBuild = useCallback(() => {
+    setBuildLog('')
+    setBuildProgress(0)
+    setBuildStatus('pending')
+    setBuildModalOpen(true)
+    emit('build:start', { config: formData });
+    message.loading('Build started...');
+  }, [emit, formData]);
 
   // Render wizard content
   const renderWizardContent = () => {
@@ -779,54 +841,106 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
     
     return (
       <div className="h-full flex flex-col">
-        {/* Progress and Steps */}
+        {/* Progress and Clickable Steps */}
         <div style={{ 
           backgroundColor: colors.background.primary,
-          padding: spacing.xl,
+          padding: `${spacing.lg} ${spacing.xl}`,
           borderBottom: `1px solid ${colors.border.light}`
         }}>
-          <Row gutter={[24, 16]} align="middle">
-            <Col span={16}>
-              <Progress 
-                percent={progress} 
-                strokeColor={colors.accent[500]}
-                showInfo={false}
-                style={{ marginBottom: spacing.sm }}
-              />
-              <Steps 
-                current={currentStep} 
-                size="small"
-                style={{ marginTop: spacing.sm }}
-              >
-                {wizardSteps.map((step, index) => (
-                  <Steps.Step 
-                    key={step.key}
-                    title={step.title}
-                    icon={step.icon}
-                    status={
-                      index < currentStep ? 'finish' :
-                      index === currentStep ? 'process' : 'wait'
-                    }
+          <Row gutter={[24, 12]} align="middle">
+            <Col span={18}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: spacing.lg }}>
+                {/* Compact Progress Indicator */}
+                <div style={{ 
+                  minWidth: '120px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: spacing.sm 
+                }}>
+                  <Progress 
+                    type="circle"
+                    percent={progress} 
+                    strokeColor={colors.accent[500]}
+                    size={40}
+                    format={() => `${currentStep + 1}/${wizardSteps.length}`}
+                    strokeWidth={8}
                   />
-                ))}
-              </Steps>
+                  <div>
+                    <Text style={{ 
+                      color: colors.text.primary, 
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      display: 'block'
+                    }}>
+                      {wizardSteps[currentStep].title}
+                    </Text>
+                    <Text style={{ 
+                      color: colors.text.tertiary, 
+                      fontSize: '12px',
+                      display: 'block'
+                    }}>
+                      {progress}% Complete
+                    </Text>
+                  </div>
+                </div>
+
+                {/* Clickable Steps Breadcrumb */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Steps 
+                    current={currentStep}
+                    size="small"
+                    type="navigation"
+                    onChange={(current) => jumpToStep(current)}
+                    style={{ cursor: 'pointer' }}
+                    items={wizardSteps.map((step, index) => {
+                      const currentStepConfig = wizardSteps[currentStep]
+                      const isCurrentStepValid = validateCurrentStep(formData, currentStepConfig.schema)
+                      const canNavigate = index <= currentStep || (index === currentStep + 1 && isCurrentStepValid)
+                      return {
+                        key: step.key,
+                        title: (
+                          <span style={{
+                            color: canNavigate ? 'inherit' : colors.text.tertiary,
+                            cursor: canNavigate ? 'pointer' : 'not-allowed',
+                            fontSize: '13px',
+                            fontWeight: index === currentStep ? 600 : 400,
+                            opacity: canNavigate ? 1 : 0.5
+                          }}>
+                            {step.title}
+                          </span>
+                        ),
+                        icon: step.icon,
+                        status: getStepStatus(index)
+                      }
+                    })}
+                  />
+                </div>
+              </div>
             </Col>
-            <Col span={8} style={{ textAlign: 'right' }}>
-              <Text style={{ color: colors.text.secondary, fontSize: '14px' }}>
-                Step {currentStep + 1} of {wizardSteps.length}
-              </Text>
-              <br />
-              <Text style={{ color: colors.text.tertiary, fontSize: '12px' }}>
-                {progress}% Complete
-              </Text>
+            <Col span={6} style={{ textAlign: 'right' }}>
+              <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                <Text style={{ 
+                  color: colors.text.secondary, 
+                  fontSize: '13px',
+                  fontWeight: 500 
+                }}>
+                  {wizardSteps[currentStep].description}
+                </Text>
+                <Text style={{ 
+                  color: colors.text.tertiary, 
+                  fontSize: '11px' 
+                }}>
+                  Click any completed step to navigate
+                </Text>
+              </Space>
             </Col>
           </Row>
         </div>
 
         {/* Step Content */}
-        <div className="flex-1 overflow-auto" style={{ padding: spacing.xl }}>
-          <Row gutter={24}>
-            <Col span={16}>
+        <div className="flex-1 overflow-auto" style={{ padding: spacing.lg }}>
+          <Row gutter={[24, 16]}>
+            <Col span={18}>
               <Card
                 style={{
                   backgroundColor: colors.background.primary,
@@ -834,18 +948,35 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
                   borderRadius: '8px',
                   height: 'fit-content'
                 }}
-                bodyStyle={{ padding: spacing.xl }}
+                bodyStyle={{ padding: `${spacing.xl} ${spacing.xl} ${spacing.lg}` }}
               >
                 <Space direction="vertical" size="large" style={{ width: '100%' }}>
                   <div>
-                    <Title level={3} style={{ 
-                      margin: 0, 
-                      marginBottom: spacing.xs,
-                      color: colors.text.primary 
+                    <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md, marginBottom: spacing.sm }}>
+                      <div style={{
+                        backgroundColor: colors.accent[50],
+                        padding: spacing.sm,
+                        borderRadius: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        {currentStepConfig.icon}
+                      </div>
+                      <Title level={4} style={{ 
+                        margin: 0,
+                        color: colors.text.primary,
+                        fontWeight: 600
+                      }}>
+                        {currentStepConfig.title}
+                      </Title>
+                    </div>
+                    <Text style={{ 
+                      color: colors.text.secondary,
+                      fontSize: '14px',
+                      display: 'block',
+                      marginBottom: spacing.lg
                     }}>
-                      {currentStepConfig.title}
-                    </Title>
-                    <Text style={{ color: colors.text.secondary }}>
                       {currentStepConfig.description}
                     </Text>
                   </div>
@@ -869,71 +1000,149 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
               </Card>
             </Col>
             
-            <Col span={8}>
-              {/* Step info sidebar */}
-              <Card
-                style={{
-                  backgroundColor: colors.background.tertiary,
-                  border: `1px solid ${colors.border.light}`,
-                  borderRadius: '8px'
-                }}
-                bodyStyle={{ padding: spacing.lg }}
-              >
-                <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-                  <div>
-                    <Title level={5} style={{ 
-                      margin: 0,
-                      marginBottom: spacing.xs,
-                      color: colors.text.primary 
-                    }}>
-                      Configuration Progress
-                    </Title>
-                    <Text style={{ color: colors.text.secondary, fontSize: '13px' }}>
-                      Complete each step to build your Armbian configuration
-                    </Text>
-                  </div>
+            <Col span={6}>
+              {/* Compact Step Info Sidebar */}
+              <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                {/* Validation Status */}
+                {stepValidation[currentStep] !== undefined && (
+                  <Alert
+                    message={stepValidation[currentStep] ? "Step Complete" : "Required fields missing"}
+                    type={stepValidation[currentStep] ? "success" : "warning"}
+                    showIcon
+                    style={{ marginBottom: spacing.sm }}
+                  />
+                )}
 
-                  <div>
-                    {stepValidation[currentStep] !== undefined && (
-                      <Alert
-                        message={stepValidation[currentStep] ? "Step Valid" : "Missing Required Fields"}
-                        type={stepValidation[currentStep] ? "success" : "warning"}
-                        showIcon
-                      />
-                    )}
-                  </div>
-
-                  <Divider style={{ margin: `${spacing.sm} 0` }} />
-
-                  <div>
+                {/* Quick Navigation */}
+                <Card
+                  size="small"
+                  style={{
+                    backgroundColor: colors.background.tertiary,
+                    border: `1px solid ${colors.border.light}`,
+                    borderRadius: '6px'
+                  }}
+                  bodyStyle={{ padding: spacing.md }}
+                >
+                  <Space direction="vertical" size="small" style={{ width: '100%' }}>
                     <Text style={{ 
-                      color: colors.text.secondary,
-                      fontSize: '12px',
-                      fontWeight: 500
+                      color: colors.text.primary,
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      display: 'block'
                     }}>
-                      NEXT STEPS
+                      Quick Navigation
                     </Text>
-                    {currentStep < wizardSteps.length - 1 && (
-                      <div style={{ marginTop: spacing.xs }}>
-                        <Text style={{ fontSize: '13px', color: colors.text.primary }}>
-                          {wizardSteps[currentStep + 1].title}
-                        </Text>
-                        <br />
-                        <Text style={{ fontSize: '12px', color: colors.text.tertiary }}>
-                          {wizardSteps[currentStep + 1].description}
-                        </Text>
-                      </div>
-                    )}
-                    {currentStep === wizardSteps.length - 1 && (
-                      <div style={{ marginTop: spacing.xs }}>
-                        <Text style={{ fontSize: '13px', color: colors.success[600] }}>
-                          Review and save your configuration
-                        </Text>
-                      </div>
-                    )}
-                  </div>
-                </Space>
-              </Card>
+                    
+                    {wizardSteps.map((step, index) => {
+                      const isCompleted = index < currentStep
+                      const isCurrent = index === currentStep
+                      const canNavigate = index <= currentStep
+                      
+                      return (
+                        <div 
+                          key={step.key}
+                          onClick={() => canNavigate && jumpToStep(index)}
+                          style={{
+                            padding: `${spacing.xs} ${spacing.sm}`,
+                            borderRadius: '4px',
+                            backgroundColor: isCurrent ? colors.accent[50] : 'transparent',
+                            cursor: canNavigate ? 'pointer' : 'default',
+                            transition: 'all 0.2s ease',
+                            border: isCurrent ? `1px solid ${colors.accent[500]}` : '1px solid transparent'
+                          }}
+                        >
+                          <Space size="small">
+                            <span style={{
+                              color: isCompleted ? colors.success[500] : 
+                                     isCurrent ? colors.accent[600] : colors.text.tertiary,
+                              fontSize: '12px'
+                            }}>
+                              {isCompleted ? '✓' : index + 1}
+                            </span>
+                            <Text style={{
+                              fontSize: '12px',
+                              color: isCurrent ? colors.accent[700] : 
+                                     isCompleted ? colors.text.primary : colors.text.tertiary,
+                              fontWeight: isCurrent ? 500 : 400
+                            }}>
+                              {step.title}
+                            </Text>
+                          </Space>
+                        </div>
+                      )
+                    })}
+                  </Space>
+                </Card>
+
+                {/* Next Step Preview */}
+                {currentStep < wizardSteps.length - 1 && (
+                  <Card
+                    size="small"
+                    style={{
+                      backgroundColor: colors.background.secondary,
+                      border: `1px solid ${colors.border.light}`,
+                      borderRadius: '6px'
+                    }}
+                    bodyStyle={{ padding: spacing.md }}
+                  >
+                    <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                      <Text style={{ 
+                        color: colors.text.secondary,
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}>
+                        Next Step
+                      </Text>
+                      <Text style={{ 
+                        fontSize: '13px', 
+                        color: colors.text.primary,
+                        fontWeight: 500,
+                        display: 'block'
+                      }}>
+                        {wizardSteps[currentStep + 1].title}
+                      </Text>
+                      <Text style={{ 
+                        fontSize: '12px', 
+                        color: colors.text.tertiary,
+                        lineHeight: '1.4'
+                      }}>
+                        {wizardSteps[currentStep + 1].description}
+                      </Text>
+                    </Space>
+                  </Card>
+                )}
+
+                {/* Final Step */}
+                {currentStep === wizardSteps.length - 1 && (
+                  <Card
+                    size="small"
+                    style={{
+                      backgroundColor: colors.success[50],
+                      border: `1px solid ${colors.success[500]}`,
+                      borderRadius: '6px'
+                    }}
+                    bodyStyle={{ padding: spacing.md }}
+                  >
+                    <Space direction="vertical" size="small">
+                      <Text style={{ 
+                        fontSize: '13px', 
+                        color: colors.success[700],
+                        fontWeight: 600
+                      }}>
+                        🎉 Ready to Build!
+                      </Text>
+                      <Text style={{ 
+                        fontSize: '12px', 
+                        color: colors.success[600]
+                      }}>
+                        Your configuration is complete and ready for building.
+                      </Text>
+                    </Space>
+                  </Card>
+                )}
+              </Space>
             </Col>
           </Row>
         </div>
@@ -980,14 +1189,14 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
             <Button
               type="primary"
               icon={<CheckCircleOutlined />}
-              onClick={() => handleSubmit({ formData })}
+              onClick={handleBuild}
               disabled={!isValid || readonly}
               style={{
                 backgroundColor: colors.success[500],
                 borderColor: colors.success[500]
               }}
             >
-              Complete Configuration
+              Build
             </Button>
           )}
         </div>
@@ -997,11 +1206,9 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
 
   return (
     <div 
-      className="h-full flex flex-col bbos-config-editor-wrapper"
       style={{ 
-        backgroundColor: colors.background.secondary,
+        backgroundColor: colors.background.tertiary,
         padding: spacing.lg,
-        // Override any inherited styles that might cause color conflicts
         color: colors.text.primary,
         fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
       }}
@@ -1213,6 +1420,19 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
                   >
                     Save Configuration
                   </Button>
+                  <Button
+                    type="primary"
+                    icon={<CheckCircleOutlined />}
+                    onClick={handleBuild}
+                    disabled={readonly || !isValid}
+                    style={{
+                      backgroundColor: colors.success[500],
+                      borderColor: colors.success[500],
+                      marginLeft: spacing.md
+                    }}
+                  >
+                    Build
+                  </Button>
                 </Space>
               </div>
             </TabPane>
@@ -1231,6 +1451,27 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
           </Tabs>
         </Card>
       </div>
+
+      {/* Build Modal */}
+      <Modal
+        open={buildModalOpen}
+        onCancel={() => setBuildModalOpen(false)}
+        footer={null}
+        title="Remote Build Progress"
+        width={700}
+        bodyStyle={{ background: colors.background.secondary }}
+        destroyOnClose
+      >
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', background: colors.background.tertiary, borderRadius: 6, padding: 16, minHeight: 240, maxHeight: 400, overflowY: 'auto', fontSize: 14, color: colors.text.primary }}>
+          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{buildLog || 'Waiting for build output...'}</pre>
+        </div>
+        <div style={{ marginTop: 16 }}>
+          <Progress percent={buildProgress} status={buildStatus === 'failed' ? 'exception' : buildStatus === 'completed' ? 'success' : 'active'} />
+          <div style={{ marginTop: 8, color: buildStatus === 'failed' ? colors.error[600] : buildStatus === 'completed' ? colors.success[600] : colors.text.secondary }}>
+            {buildStatus === 'failed' ? 'Build failed.' : buildStatus === 'completed' ? 'Build completed!' : 'Building...'}
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

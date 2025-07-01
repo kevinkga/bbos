@@ -10,9 +10,10 @@ export interface SocketState {
 
 export interface BuildStatus {
   id: string;
-  status: 'pending' | 'building' | 'completed' | 'failed';
+  status: string;
   progress: number;
   message: string;
+  timestamp: string;
   startTime?: string;
   endTime?: string;
 }
@@ -90,8 +91,13 @@ export const useSocket = (options: UseSocketOptions = {}) => {
     });
     
     // Build status updates
-    socket.on('build:status', (buildData: BuildStatus) => {
+    socket.on('build:update', (buildData: BuildStatus) => {
       console.log('🏗️ Build update received:', buildData);
+      options.onBuildUpdate?.(buildData);
+    });
+    
+    socket.on('build:status', (buildData: BuildStatus) => {
+      console.log('🏗️ Legacy build status received:', buildData);
       options.onBuildUpdate?.(buildData);
     });
     
