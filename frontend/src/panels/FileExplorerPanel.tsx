@@ -7,7 +7,7 @@ import {
   Dropdown, 
   Modal, 
   Input, 
-  message, 
+  App,
   Upload, 
   Card,
   Tooltip,
@@ -68,6 +68,7 @@ export const FileExplorerPanel: React.FC<FileExplorerPanelProps> = ({
   onFileDelete,
   selectedFileId
 }) => {
+  const { message } = App.useApp()
   const [treeData, setTreeData] = useState<FileNode[]>([])
   const [expandedKeys, setExpandedKeys] = useState<React.Key[]>(['configs', 'templates', 'scripts'])
   const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([])

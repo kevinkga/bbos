@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Layout as FlexLayout, Model, TabNode } from 'flexlayout-react'
-import { ConfigProvider, Button, Dropdown, Typography, Tooltip, notification } from 'antd'
+import { ConfigProvider, App as AntdApp, Button, Dropdown, Typography, Tooltip, notification } from 'antd'
 import { 
   SettingOutlined, 
   LayoutOutlined, 
@@ -12,7 +12,7 @@ import {
 import { FlexLayoutFactory } from '@/layouts/FlexLayoutFactory'
 import { useAppStore } from '@/stores/app'
 import { ArmbianConfiguration } from '@/types'
-import { antdTheme, colors, components } from '@/styles/design-tokens'
+import { colors } from '@/styles/design-tokens'
 import { useSocket, BuildStatus } from '@/hooks/useSocket'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ConnectionStatusCompact } from '@/components/ConnectionStatus'
@@ -29,7 +29,7 @@ interface AppProps {
   theme?: 'light' | 'dark'
 }
 
-const App: React.FC<AppProps> = ({ theme: appTheme = 'light' }) => {
+const App: React.FC<AppProps> = ({ theme = 'light' }) => {
   const [model, setModel] = useState<Model | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [buildStatuses, setBuildStatuses] = useState<BuildStatus[]>([])
@@ -121,7 +121,8 @@ const App: React.FC<AppProps> = ({ theme: appTheme = 'light' }) => {
   const factory = useCallback((node: TabNode) => {
     const component = node.getComponent()
 
-    switch (component) {
+    try {
+      switch (component) {
       case 'WelcomePanel':
         return (
           <WelcomePanel
@@ -353,6 +354,20 @@ const App: React.FC<AppProps> = ({ theme: appTheme = 'light' }) => {
       default:
         return <div className="p-4">Unknown Panel: {component}</div>
     }
+    } catch (error) {
+      console.error('Error rendering component:', component, error)
+      return (
+        <div className="p-4">
+          <div className="text-red-600 font-bold">Error rendering component: {component}</div>
+          <div className="text-sm text-gray-600 mt-2">
+            {error instanceof Error ? error.message : String(error)}
+          </div>
+          <div className="text-xs text-gray-500 mt-2">
+            {error instanceof Error && error.stack ? error.stack.split('\n').slice(0, 3).join('\n') : ''}
+          </div>
+        </div>
+      )
+    }
   }, [currentConfig])
 
   // Layout preset options
@@ -431,7 +446,8 @@ const App: React.FC<AppProps> = ({ theme: appTheme = 'light' }) => {
           }
         }}
       >
-        <div className="h-screen flex flex-col" style={{ backgroundColor: colors.background.secondary }}>
+        <AntdApp>
+          <div className="h-screen flex flex-col" style={{ backgroundColor: colors.background.secondary }}>
         {/* Top toolbar */}
         <div 
           className="flex-shrink-0 h-12 flex items-center justify-between px-4"
@@ -514,8 +530,9 @@ const App: React.FC<AppProps> = ({ theme: appTheme = 'light' }) => {
             onModelChange={handleModelChange}
           />
         </div>
-      </div>
-    </ConfigProvider>
+        </div>
+        </AntdApp>
+      </ConfigProvider>
     </ErrorBoundary>
   )
 }
