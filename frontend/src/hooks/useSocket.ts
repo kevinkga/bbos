@@ -96,6 +96,21 @@ export const useSocket = (options: UseSocketOptions = {}) => {
       options.onBuildUpdate?.(buildData);
     });
     
+    socket.on('build:completed', (buildData: BuildStatus) => {
+      console.log('✅ Build completed received:', buildData);
+      options.onBuildUpdate?.(buildData);
+    });
+    
+    socket.on('build:failed', (buildData: BuildStatus) => {
+      console.log('❌ Build failed received:', buildData);
+      options.onBuildUpdate?.(buildData);
+    });
+    
+    socket.on('build:cancelled', (buildData: BuildStatus) => {
+      console.log('🛑 Build cancelled received:', buildData);
+      options.onBuildUpdate?.(buildData);
+    });
+    
     socket.on('build:status', (buildData: BuildStatus) => {
       console.log('🏗️ Legacy build status received:', buildData);
       options.onBuildUpdate?.(buildData);

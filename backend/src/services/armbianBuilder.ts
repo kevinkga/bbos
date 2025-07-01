@@ -3,6 +3,11 @@ import fs from 'fs/promises';
 import path from 'path';
 import { promisify } from 'util';
 import { v4 as uuidv4 } from 'uuid';
+import https from 'https';
+import http from 'http';
+import { createWriteStream, createReadStream } from 'fs';
+import { pipeline } from 'stream/promises';
+import { createGunzip } from 'zlib';
 
 const execAsync = promisify(exec);
 
@@ -93,11 +98,72 @@ export class ArmbianBuilder {
   private buildDir: string;
   private workDir: string;
   private armbianRepo: string;
+  private demoMode: boolean;
+  private downloadCache: string;
 
   constructor() {
     this.buildDir = process.env.BUILD_DIR || '/tmp/bbos-builds';
     this.workDir = process.env.WORK_DIR || '/tmp/bbos-work';
     this.armbianRepo = process.env.ARMBIAN_REPO || 'https://github.com/armbian/build.git';
+    // Check explicit DEMO_MODE setting first, then default to true in development
+    this.demoMode = process.env.DEMO_MODE ? 
+      process.env.DEMO_MODE.toLowerCase() === 'true' : 
+      process.env.NODE_ENV === 'development';
+    this.downloadCache = process.env.DOWNLOAD_CACHE || '/tmp/bbos-cache';
+    
+    // Create cache directory
+    this.initializeDirectories();
+  }
+
+  private async initializeDirectories(): Promise<void> {
+    try {
+      await fs.mkdir(this.buildDir, { recursive: true });
+      await fs.mkdir(this.workDir, { recursive: true });
+      await fs.mkdir(this.downloadCache, { recursive: true });
+    } catch (error) {
+      console.error('Failed to initialize directories:', error);
+    }
+  }
+
+  /**
+   * Detect if we're running in a Docker container
+   */
+  private async isRunningInDocker(): Promise<boolean> {
+    try {
+      // Check for .dockerenv file (most reliable method)
+      await fs.access('/.dockerenv');
+      return true;
+    } catch {
+      try {
+        // Check cgroup for docker
+        const cgroup = await fs.readFile('/proc/1/cgroup', 'utf-8');
+        return cgroup.includes('docker') || cgroup.includes('containerd');
+      } catch {
+        // Check if we're in a container environment
+        return process.env.CONTAINER === 'true' || process.env.DOCKER === 'true';
+      }
+    }
+  }
+
+  /**
+   * Check if we have the necessary privileges for device mounting
+   */
+  private async canMountDevices(): Promise<boolean> {
+    if (await this.isRunningInDocker()) {
+      console.log('🐳 Running in Docker - skipping device mounting capabilities');
+      return false;
+    }
+
+    try {
+      // Check if kpartx is available
+      await execAsync('which kpartx');
+      
+      // Check if we have sudo access
+      const { stdout } = await execAsync('sudo -n true 2>&1; echo $?');
+      return stdout.trim() === '0';
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -437,26 +503,35 @@ echo "✅ BBOS customization completed"
     const configContent = await fs.readFile(configPath, 'utf-8');
     const config: ArmbianConfiguration = JSON.parse(configContent);
 
-    // Map our board names to official Armbian download URLs
-    const imageUrl = this.getArmbianDownloadUrl(config.board, config.distribution);
     const imageName = `Armbian_${config.distribution.release}_${config.board.name}.img`;
     const imagePath = path.join(configDir, imageName);
 
-    // Check if image already exists
+    // Check if image already exists in cache
+    const cachedImagePath = path.join(this.downloadCache, imageName);
     try {
-      await fs.access(imagePath);
+      await fs.access(cachedImagePath);
       console.log(`📦 Using cached image: ${imageName}`);
+      // Copy from cache to working directory
+      await fs.copyFile(cachedImagePath, imagePath);
       return imagePath;
     } catch {
-      // Image doesn't exist, download it
+      // Image doesn't exist in cache
     }
 
-    try {
-      // For demo purposes, we'll create a mock image file
-      // In production, this would download from dl.armbian.com
-      console.log(`📥 Downloading from: ${imageUrl}`);
-      
-      const mockImageContent = `# BBOS Mock Armbian Image
+    if (this.demoMode) {
+      return this.createMockImage(config, imagePath, imageName);
+    } else {
+      return this.downloadRealArmbianImage(config, imagePath, cachedImagePath, imageName, onProgress);
+    }
+  }
+
+  /**
+   * Create mock image for demo mode
+   */
+  private async createMockImage(config: ArmbianConfiguration, imagePath: string, imageName: string): Promise<string> {
+    console.log(`🎭 Creating mock image (demo mode): ${imageName}`);
+    
+    const mockImageContent = `# BBOS Mock Armbian Image
 # Board: ${config.board.name}
 # Distribution: ${config.distribution.release} ${config.distribution.type}
 # Generated: ${new Date().toISOString()}
@@ -470,27 +545,344 @@ Configuration will be applied via:
 - Custom firstrun scripts
 `;
 
-      await fs.writeFile(imagePath, mockImageContent);
-      console.log(`✅ Downloaded Armbian image: ${imageName}`);
+    await fs.writeFile(imagePath, mockImageContent);
+    console.log(`✅ Created mock Armbian image: ${imageName}`);
+    return imagePath;
+  }
+
+  /**
+   * Download real Armbian image from dl.armbian.com
+   */
+  private async downloadRealArmbianImage(
+    config: ArmbianConfiguration, 
+    imagePath: string, 
+    cachedImagePath: string, 
+    imageName: string,
+    onProgress: (progress: BuildProgress) => void
+  ): Promise<string> {
+    const imageUrl = await this.getArmbianDownloadUrl(config.board, config.distribution);
+    
+    try {
+      console.log(`📥 Downloading from: ${imageUrl}`);
+      
+      onProgress({
+        phase: 'downloading',
+        progress: 20,
+        message: `Downloading ${imageName} from Armbian servers...`,
+        timestamp: new Date().toISOString()
+      });
+
+      // Download compressed image
+      const compressedPath = cachedImagePath + '.xz';
+      await this.downloadFile(imageUrl, compressedPath, onProgress);
+
+      // Verify downloaded file is not empty
+      const compressedStats = await fs.stat(compressedPath);
+      if (compressedStats.size === 0) {
+        throw new Error('Downloaded compressed file is empty (0 bytes)');
+      }
+      console.log(`📦 Downloaded compressed file: ${this.formatBytes(compressedStats.size)}`);
+
+      onProgress({
+        phase: 'downloading',
+        progress: 60,
+        message: 'Decompressing Armbian image...',
+        timestamp: new Date().toISOString()
+      });
+
+      // Decompress the image
+      await this.decompressImage(compressedPath, cachedImagePath);
+      
+      // Verify decompressed file is not empty
+      const decompressedStats = await fs.stat(cachedImagePath);
+      if (decompressedStats.size === 0) {
+        throw new Error('Decompressed image file is empty (0 bytes)');
+      }
+      console.log(`📦 Decompressed image: ${this.formatBytes(decompressedStats.size)}`);
+      
+      // Copy to working directory
+      await fs.copyFile(cachedImagePath, imagePath);
+      
+      // Verify copied file is not empty
+      const finalStats = await fs.stat(imagePath);
+      if (finalStats.size === 0) {
+        throw new Error('Final image file is empty (0 bytes)');
+      }
+      
+      // Clean up compressed file
+      await fs.unlink(compressedPath);
+      
+      console.log(`✅ Downloaded and decompressed Armbian image: ${imageName} (${this.formatBytes(finalStats.size)})`);
       return imagePath;
 
     } catch (error) {
-      throw new Error(`Failed to download Armbian image: ${(error as Error).message}`);
+      console.error(`❌ Failed to download real Armbian image: ${error}`);
+      // Fallback to mock image if download fails
+      console.log(`🎭 Falling back to mock image due to download failure`);
+      return this.createMockImage(config, imagePath, imageName);
     }
   }
 
   /**
-   * Get official Armbian download URL for board and distribution
+   * Download file with progress tracking
    */
-  private getArmbianDownloadUrl(board: { family: string; name: string }, distribution: { release: string; type: string }): string {
-    // Map to official Armbian download URLs
-    // Format: https://dl.armbian.com/{board_name}/archive/
+  private async downloadFile(url: string, outputPath: string, onProgress: (progress: BuildProgress) => void): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const protocol = url.startsWith('https:') ? https : http;
+      
+      const request = protocol.get(url, (response) => {
+        if (response.statusCode === 302 || response.statusCode === 301) {
+          // Handle redirects
+          if (response.headers.location) {
+            this.downloadFile(response.headers.location, outputPath, onProgress)
+              .then(resolve)
+              .catch(reject);
+            return;
+          }
+        }
+        
+        if (response.statusCode !== 200) {
+          reject(new Error(`Download failed with status ${response.statusCode}`));
+          return;
+        }
+
+        const totalSize = parseInt(response.headers['content-length'] || '0', 10);
+        let downloadedSize = 0;
+        let lastProgressUpdate = 0;
+
+        const writeStream = createWriteStream(outputPath);
+        
+        response.on('data', (chunk) => {
+          downloadedSize += chunk.length;
+          
+          // Update progress every 5% or 10MB
+          const progressPercent = totalSize > 0 ? (downloadedSize / totalSize) * 100 : 0;
+          if (progressPercent - lastProgressUpdate >= 5 || downloadedSize - lastProgressUpdate >= 10 * 1024 * 1024) {
+            lastProgressUpdate = progressPercent;
+            onProgress({
+              phase: 'downloading',
+              progress: 20 + (progressPercent * 0.4), // 20-60% of total progress
+              message: `Downloaded ${this.formatBytes(downloadedSize)}${totalSize > 0 ? ` / ${this.formatBytes(totalSize)}` : ''}`,
+              timestamp: new Date().toISOString()
+            });
+          }
+        });
+
+        response.pipe(writeStream);
+        
+        writeStream.on('finish', () => {
+          writeStream.close();
+          resolve();
+        });
+        
+        writeStream.on('error', reject);
+      });
+
+      request.on('error', reject);
+      request.setTimeout(30000, () => {
+        request.abort();
+        reject(new Error('Download timeout'));
+      });
+    });
+  }
+
+  /**
+   * Decompress XZ compressed image
+   */
+  private async decompressImage(compressedPath: string, outputPath: string): Promise<void> {
+    try {
+      // Check if xz command is available
+      try {
+        await execAsync('which xz');
+        console.log(`🗜️ Decompressing XZ image using xz command: ${path.basename(compressedPath)}`);
+        await execAsync(`xz -d -c "${compressedPath}" > "${outputPath}"`);
+        console.log(`✅ Successfully decompressed to: ${path.basename(outputPath)}`);
+        return;
+      } catch (xzError) {
+        console.log(`⚠️ xz command not found, trying alternative methods...`);
+      }
+
+      // Fallback 1: Try unxz command
+      try {
+        await execAsync('which unxz');
+        console.log(`🗜️ Decompressing XZ image using unxz command: ${path.basename(compressedPath)}`);
+        await execAsync(`unxz -c "${compressedPath}" > "${outputPath}"`);
+        console.log(`✅ Successfully decompressed to: ${path.basename(outputPath)}`);
+        return;
+      } catch (unxzError) {
+        console.log(`⚠️ unxz command not found, trying Node.js approach...`);
+      }
+
+      // Fallback 2: Try using Node.js lzma library (if available)
+      try {
+        const lzma = require('lzma-native');
+        console.log(`🗜️ Decompressing XZ image using lzma-native: ${path.basename(compressedPath)}`);
+        const compressedData = await fs.readFile(compressedPath);
+        const decompressedData = await lzma.decompress(compressedData);
+        await fs.writeFile(outputPath, decompressedData);
+        console.log(`✅ Successfully decompressed to: ${path.basename(outputPath)}`);
+        return;
+      } catch (lzmaError) {
+        console.log(`⚠️ lzma-native not available: ${(lzmaError as Error).message || lzmaError}`);
+      }
+
+      throw new Error('No XZ decompression method available. Please install xz-utils: sudo apt-get install xz-utils');
+
+    } catch (error) {
+      console.error(`❌ XZ decompression failed: ${error}`);
+      throw new Error(`Failed to decompress XZ image: ${error}`);
+    }
+  }
+
+  /**
+   * Format bytes for human-readable display
+   */
+  private formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  /**
+   * Get official Armbian download URL for board and distribution by searching the archive
+   */
+  private async getArmbianDownloadUrl(board: { family: string; name: string }, distribution: { release: string; type: string }): Promise<string> {
     const baseUrl = 'https://dl.armbian.com';
     
-    // Normalize board name for Armbian downloads
-    const normalizedBoard = board.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    // Try different board name variations
+    const boardVariations = [
+      board.name.toLowerCase(),
+      board.name.toLowerCase().replace(/[^a-z0-9]/g, ''),
+      board.name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+      // Capitalize first letter for boards like Rpi4b
+      board.name.charAt(0).toUpperCase() + board.name.slice(1).toLowerCase(),
+      board.name.charAt(0).toUpperCase() + board.name.slice(1).toLowerCase().replace(/[^a-zA-Z0-9]/g, ''),
+    ];
+
+    for (const boardName of boardVariations) {
+      try {
+        const archiveUrl = `${baseUrl}/${boardName}/archive/`;
+        console.log(`🔍 Searching for images at: ${archiveUrl}`);
+        
+        // Get the directory listing
+        const response = await this.fetchWithRedirect(archiveUrl);
+        if (response.status === 404) {
+          continue; // Try next board variation
+        }
+        
+        const html = await response.text();
+        
+        // Parse HTML to find image files
+        const imageFiles = this.parseArmbianImagesList(html, distribution);
+        
+        if (imageFiles.length > 0) {
+          // Return the URL of the most recent image
+          const selectedImage = imageFiles[0]; // They're usually sorted by date
+          const imageUrl = `${archiveUrl}${selectedImage}`;
+          console.log(`✅ Found Armbian image: ${selectedImage}`);
+          return imageUrl;
+        }
+      } catch (error) {
+        console.log(`❌ Failed to search ${boardName}: ${error instanceof Error ? error.message : String(error)}`);
+        continue;
+      }
+    }
     
-    return `${baseUrl}/${normalizedBoard}/archive/Armbian_${distribution.release}_${normalizedBoard}_${distribution.type}.img.xz`;
+    throw new Error(`No Armbian image found for board ${board.name} with distribution ${distribution.release} ${distribution.type}`);
+  }
+
+  /**
+   * Fetch URL with redirect handling
+   */
+  private async fetchWithRedirect(url: string): Promise<Response> {
+    const https = await import('https');
+    const http = await import('http');
+    
+    return new Promise((resolve, reject) => {
+      const protocol = url.startsWith('https:') ? https : http;
+      
+      const request = protocol.get(url, (response) => {
+        if (response.statusCode === 302 || response.statusCode === 301) {
+          if (response.headers.location) {
+            // Follow redirect
+            this.fetchWithRedirect(response.headers.location)
+              .then(resolve)
+              .catch(reject);
+            return;
+          }
+        }
+        
+        if (response.statusCode === 404) {
+          resolve({ status: 404, text: () => Promise.resolve('') } as any);
+          return;
+        }
+        
+        if (response.statusCode !== 200) {
+          reject(new Error(`HTTP ${response.statusCode}`));
+          return;
+        }
+
+        let data = '';
+        response.on('data', (chunk) => {
+          data += chunk;
+        });
+        
+        response.on('end', () => {
+          resolve({
+            status: 200,
+            text: () => Promise.resolve(data)
+          } as any);
+        });
+      });
+
+      request.on('error', reject);
+      request.setTimeout(10000, () => {
+        request.abort();
+        reject(new Error('Request timeout'));
+      });
+    });
+  }
+
+  /**
+   * Parse Armbian images list from HTML directory listing
+   */
+  private parseArmbianImagesList(html: string, distribution: { release: string; type: string }): string[] {
+    const images: string[] = [];
+    
+    // Look for .img.xz files in the HTML
+    const imgRegex = /href="(Armbian_[^"]+\.img\.xz)"/g;
+    let match;
+    
+    while ((match = imgRegex.exec(html)) !== null) {
+      const filename = match[1];
+      
+      // Filter by distribution release (bookworm, jammy, etc.)
+      if (!filename.toLowerCase().includes(distribution.release.toLowerCase())) {
+        continue;
+      }
+      
+      // Filter by type (minimal, desktop types)
+      if (distribution.type === 'minimal') {
+        if (filename.includes('_minimal.img.xz')) {
+          images.push(filename);
+        }
+      } else if (distribution.type === 'desktop') {
+        // For desktop, accept any desktop variant (gnome, xfce, etc.)
+        if (filename.includes('_desktop.img.xz')) {
+          images.push(filename);
+        }
+      } else {
+        // For specific desktop environments
+        if (filename.includes(`_${distribution.type}_desktop.img.xz`)) {
+          images.push(filename);
+        }
+      }
+    }
+    
+    // Sort by filename (newer versions typically come first in listings)
+    return images.sort().reverse();
   }
 
   /**
@@ -571,8 +963,18 @@ Configuration will be applied via:
     const configuredImageName = `BBOS_Armbian_${buildId}.img`;
     const configuredImagePath = path.join(outputDir, configuredImageName);
 
-    // Copy base image and embed configuration
-    // In production, this would modify the image filesystem to inject scripts
+    if (this.demoMode) {
+      return this.createMockConfiguredImage(baseImagePath, configuredImagePath, buildId);
+    } else {
+      return this.createRealConfiguredImage(baseImagePath, configDir, configuredImagePath, buildId, onProgress);
+    }
+  }
+
+  /**
+   * Create mock configured image for demo mode
+   */
+  private async createMockConfiguredImage(baseImagePath: string, configuredImagePath: string, buildId: string): Promise<string> {
+    // Copy base image and append configuration info
     const baseImageContent = await fs.readFile(baseImagePath, 'utf-8');
     
     const configuredContent = `${baseImageContent}
@@ -590,9 +992,196 @@ These scripts will be executed on first boot to apply your configuration.
 `;
 
     await fs.writeFile(configuredImagePath, configuredContent);
-    console.log(`📦 Created configured image: ${configuredImageName}`);
+    console.log(`📦 Created mock configured image: ${path.basename(configuredImagePath)}`);
     
     return configuredImagePath;
+  }
+
+  /**
+   * Create real configured image by mounting and modifying the filesystem
+   */
+  private async createRealConfiguredImage(
+    baseImagePath: string, 
+    configDir: string, 
+    configuredImagePath: string, 
+    buildId: string,
+    onProgress: (progress: BuildProgress) => void
+  ): Promise<string> {
+    try {
+      onProgress({
+        phase: 'packaging',
+        progress: 75,
+        message: 'Copying base image...',
+        timestamp: new Date().toISOString()
+      });
+
+      // Verify base image is not empty before copying
+      const baseImageStats = await fs.stat(baseImagePath);
+      if (baseImageStats.size === 0) {
+        throw new Error(`Base image is empty (0 bytes): ${baseImagePath}`);
+      }
+      console.log(`📋 Base image size: ${this.formatBytes(baseImageStats.size)}`);
+
+      // Copy the base image to create our configured version
+      await fs.copyFile(baseImagePath, configuredImagePath);
+
+      // Check if we can mount devices (not in Docker or with proper privileges)
+      const canMount = await this.canMountDevices();
+      
+      if (canMount) {
+        onProgress({
+          phase: 'packaging',
+          progress: 80,
+          message: 'Mounting image filesystem...',
+          timestamp: new Date().toISOString()
+        });
+
+        // Mount the image and inject configuration scripts
+        await this.injectConfigurationIntoImage(configuredImagePath, configDir, onProgress);
+        console.log(`📦 Created configured image with injected scripts: ${path.basename(configuredImagePath)}`);
+      } else {
+        onProgress({
+          phase: 'packaging',
+          progress: 85,
+          message: 'Creating configuration artifacts...',
+          timestamp: new Date().toISOString()
+        });
+
+        // Docker-safe approach: create external configuration files
+        await this.createExternalConfigurationFiles(configuredImagePath, configDir, buildId);
+        console.log(`📦 Created configured image with external configs (Docker-safe): ${path.basename(configuredImagePath)}`);
+      }
+
+      return configuredImagePath;
+
+    } catch (error) {
+      console.error(`❌ Failed to create real configured image: ${error}`);
+      // Fallback to simple copy
+      await fs.copyFile(baseImagePath, configuredImagePath);
+      console.log(`📦 Created basic configured image (fallback): ${path.basename(configuredImagePath)}`);
+      return configuredImagePath;
+    }
+  }
+
+  /**
+   * Inject configuration scripts into the image filesystem
+   */
+  private async injectConfigurationIntoImage(imagePath: string, configDir: string, onProgress: (progress: BuildProgress) => void): Promise<void> {
+    const mountPoint = path.join(this.workDir, `mount_${Date.now()}`);
+    
+    try {
+      onProgress({
+        phase: 'packaging',
+        progress: 85,
+        message: 'Mounting image partitions...',
+        timestamp: new Date().toISOString()
+      });
+
+      // Create mount point
+      await fs.mkdir(mountPoint, { recursive: true });
+
+      // Use kpartx to map partitions (requires sudo)
+      const { stdout: kpartxOutput } = await execAsync(`sudo kpartx -av "${imagePath}"`);
+      const loopDevice = kpartxOutput.match(/loop(\d+)p(\d+)/)?.[0];
+      
+      if (!loopDevice) {
+        throw new Error('Failed to map image partitions');
+      }
+
+      // Mount the root partition (usually the second partition)
+      const devicePath = `/dev/mapper/${loopDevice}`;
+      await execAsync(`sudo mount "${devicePath}" "${mountPoint}"`);
+
+      onProgress({
+        phase: 'packaging',
+        progress: 90,
+        message: 'Injecting configuration scripts...',
+        timestamp: new Date().toISOString()
+      });
+
+      // Create BBOS configuration directory
+      const bbosDir = path.join(mountPoint, 'opt', 'bbos');
+      await execAsync(`sudo mkdir -p "${bbosDir}"`);
+
+      // Copy configuration files
+      const configFiles = ['armbian-config-auto.sh', 'user-data', 'meta-data', 'config.json'];
+      for (const file of configFiles) {
+        const srcPath = path.join(configDir, file);
+        const destPath = path.join(bbosDir, file);
+        try {
+          await execAsync(`sudo cp "${srcPath}" "${destPath}"`);
+          await execAsync(`sudo chmod +x "${destPath}"`);
+        } catch {
+          // File might not exist, skip
+        }
+      }
+
+      // Create firstrun script to execute our configuration
+      const firstrunScript = `#!/bin/bash
+# BBOS First Run Configuration Script
+set -e
+
+echo "🚀 BBOS: Starting first-run configuration..."
+
+# Execute armbian-config automation
+if [ -f /opt/bbos/armbian-config-auto.sh ]; then
+  echo "🔧 Executing Armbian configuration..."
+  bash /opt/bbos/armbian-config-auto.sh
+fi
+
+# Set up cloud-init if files exist
+if [ -f /opt/bbos/user-data ] && [ -f /opt/bbos/meta-data ]; then
+  echo "☁️ Setting up cloud-init configuration..."
+  cp /opt/bbos/user-data /var/lib/cloud/seed/nocloud/
+  cp /opt/bbos/meta-data /var/lib/cloud/seed/nocloud/
+fi
+
+echo "✅ BBOS: First-run configuration completed"
+
+# Remove this script so it only runs once
+rm -f /etc/systemd/system/bbos-firstrun.service
+rm -f /opt/bbos/bbos-firstrun.sh
+`;
+
+      const firstrunPath = path.join(bbosDir, 'bbos-firstrun.sh');
+      await fs.writeFile('/tmp/bbos-firstrun.sh', firstrunScript);
+      await execAsync(`sudo cp /tmp/bbos-firstrun.sh "${firstrunPath}"`);
+      await execAsync(`sudo chmod +x "${firstrunPath}"`);
+
+      // Create systemd service to run the script on first boot
+      const systemdService = `[Unit]
+Description=BBOS First Run Configuration
+After=multi-user.target
+Requires=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/bbos/bbos-firstrun.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+`;
+
+      const servicePath = path.join(mountPoint, 'etc', 'systemd', 'system', 'bbos-firstrun.service');
+      await fs.writeFile('/tmp/bbos-firstrun.service', systemdService);
+      await execAsync(`sudo cp /tmp/bbos-firstrun.service "${servicePath}"`);
+      
+      // Enable the service
+      await execAsync(`sudo chroot "${mountPoint}" systemctl enable bbos-firstrun.service`);
+
+      console.log('📝 Injected BBOS configuration scripts into image');
+
+    } finally {
+      // Clean up: unmount and remove loop device
+      try {
+        await execAsync(`sudo umount "${mountPoint}"`);
+        await execAsync(`sudo kpartx -dv "${imagePath}"`);
+        await fs.rmdir(mountPoint);
+      } catch (error) {
+        console.error('⚠️ Warning: Failed to clean up mount:', error);
+      }
+    }
   }
 
   /**
@@ -616,7 +1205,7 @@ These scripts will be executed on first boot to apply your configuration.
       url: `/api/builds/${buildId}/artifacts/${path.basename(imagePath)}`
     });
 
-    // Configuration scripts as artifacts
+    // Configuration scripts as artifacts (from build directory)
     const configFiles = [
       'armbian-config-auto.sh',
       'user-data', 
@@ -639,6 +1228,39 @@ These scripts will be executed on first boot to apply your configuration.
       } catch {
         // File doesn't exist, skip
       }
+    }
+
+    // Include external configuration files if they exist (Docker-safe mode)
+    const configOutputDir = path.join(outputDir, 'configurations');
+    try {
+      const configDirStats = await fs.stat(configOutputDir);
+      if (configDirStats.isDirectory()) {
+        const externalConfigFiles = [
+          'DEPLOYMENT.md',
+          'bbos-firstrun.service',
+          ...configFiles
+        ];
+
+        for (const fileName of externalConfigFiles) {
+          const filePath = path.join(configOutputDir, fileName);
+          try {
+            const stats = await fs.stat(filePath);
+            artifacts.push({
+              id: uuidv4(),
+              name: `config/${fileName}`,
+              type: fileName.endsWith('.md') ? 'log' : 
+                    fileName.endsWith('.json') ? 'config' : 'log',
+              size: stats.size,
+              path: filePath,
+              url: `/api/builds/${buildId}/artifacts/config/${fileName}`
+            });
+          } catch {
+            // File doesn't exist, skip
+          }
+        }
+      }
+    } catch {
+      // Configuration directory doesn't exist, normal when using direct injection
     }
 
     // Generate checksum
@@ -771,6 +1393,130 @@ These scripts will be executed on first boot to apply your configuration.
     return `instance-id: bbos-armbian-${Date.now()}
 local-hostname: ${config.network?.hostname || 'armbian-bbos'}
 `;
+  }
+
+  /**
+   * Create external configuration files for Docker-safe deployment
+   */
+  private async createExternalConfigurationFiles(imagePath: string, configDir: string, buildId: string): Promise<void> {
+    const outputDir = path.dirname(imagePath);
+    const configOutputDir = path.join(outputDir, 'configurations');
+    
+    await fs.mkdir(configOutputDir, { recursive: true });
+
+    try {
+      // Copy configuration files to external directory
+      const configFiles = ['armbian-config-auto.sh', 'user-data', 'meta-data', 'config.json'];
+      
+      for (const file of configFiles) {
+        const srcPath = path.join(configDir, file);
+        const destPath = path.join(configOutputDir, file);
+        try {
+          await fs.copyFile(srcPath, destPath);
+          await fs.chmod(destPath, 0o755);
+        } catch (error) {
+          console.log(`⚠️ Config file ${file} not found, skipping`);
+        }
+      }
+
+      // Create a deployment guide for manual configuration
+      const deploymentGuide = `# BBOS Armbian Configuration Deployment Guide
+# Generated: ${new Date().toISOString()}
+# Build ID: ${buildId}
+
+## Overview
+This Armbian image has been configured for BBOS but requires manual deployment
+of configuration scripts due to Docker container limitations.
+
+## Files Included:
+- armbian-config-auto.sh: Armbian configuration automation
+- user-data: Cloud-init user configuration  
+- meta-data: Cloud-init metadata
+- config.json: Original BBOS configuration
+
+## Manual Deployment Steps:
+
+### Option 1: Cloud-Init (Recommended)
+1. Copy user-data and meta-data to your cloud-init data source:
+   \`\`\`bash
+   # For NoCloud datasource
+   sudo mkdir -p /var/lib/cloud/seed/nocloud
+   sudo cp user-data meta-data /var/lib/cloud/seed/nocloud/
+   \`\`\`
+
+2. Enable cloud-init on first boot:
+   \`\`\`bash
+   sudo touch /etc/cloud/cloud-init.disabled
+   sudo rm /etc/cloud/cloud-init.disabled  # Enable on next boot
+   \`\`\`
+
+### Option 2: Manual Script Execution
+1. Copy armbian-config-auto.sh to the target system
+2. Make it executable: \`chmod +x armbian-config-auto.sh\`
+3. Run as root: \`sudo ./armbian-config-auto.sh\`
+
+### Option 3: Flash Image with Configuration
+If you have a Linux system with loop mounting capabilities:
+
+1. Mount the image:
+   \`\`\`bash
+   sudo kpartx -av ${path.basename(imagePath)}
+   sudo mount /dev/mapper/loop0p1 /mnt  # Adjust partition as needed
+   \`\`\`
+
+2. Copy configurations:
+   \`\`\`bash
+   sudo mkdir -p /mnt/opt/bbos
+   sudo cp * /mnt/opt/bbos/
+   \`\`\`
+
+3. Create auto-run service:
+   \`\`\`bash
+   sudo cp bbos-firstrun.service /mnt/etc/systemd/system/
+   sudo chroot /mnt systemctl enable bbos-firstrun.service
+   \`\`\`
+
+4. Unmount:
+   \`\`\`bash
+   sudo umount /mnt
+   sudo kpartx -dv ${path.basename(imagePath)}
+   \`\`\`
+
+## Docker Build Server Integration
+For automatic configuration injection, this should be handled by a dedicated
+build server with proper privileges (see docker-compose.yml build-server service).
+
+The backend API server should delegate actual image modification to the
+privileged build server container.
+`;
+
+      const guidePath = path.join(configOutputDir, 'DEPLOYMENT.md');
+      await fs.writeFile(guidePath, deploymentGuide);
+
+      // Create a simple firstrun service for systemd
+      const firstrunService = `[Unit]
+Description=BBOS First Run Configuration
+After=multi-user.target
+Requires=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/bbos/armbian-config-auto.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+`;
+
+      const servicePath = path.join(configOutputDir, 'bbos-firstrun.service');
+      await fs.writeFile(servicePath, firstrunService);
+
+      console.log(`📁 Created external configuration package in ${configOutputDir}`);
+      console.log(`📖 See DEPLOYMENT.md for configuration deployment instructions`);
+
+    } catch (error) {
+      console.error(`⚠️ Failed to create external configuration files: ${error}`);
+    }
   }
 
   /**

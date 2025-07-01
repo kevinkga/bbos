@@ -197,11 +197,11 @@ export class FlexLayoutFactory {
             },
             {
               type: 'tab',
-              id: 'search',
-              name: 'Search',
-              component: 'SearchPanel',
+              id: 'builds',
+              name: 'Builds',
+              component: 'BuildsPanel',
               enableClose: false,
-              icon: 'search',
+              icon: 'build',
             },
             {
               type: 'tab',

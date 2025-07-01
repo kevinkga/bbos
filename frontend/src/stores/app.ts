@@ -39,14 +39,17 @@ interface AppStore extends AppState {
   getBuildJobsByConfiguration: (configId: string) => BuildJob[]
   getActiveBuildJobs: () => BuildJob[]
   
+  // Socket-based build event handlers
+  handleBuildCreated: (event: { id: string; status: string; message: string; timestamp: string; configurationId?: string; configuration?: any }) => void
+  handleBuildUpdate: (event: { id: string; status: string; progress: number; message: string; timestamp: string; configurationId?: string; configuration?: any }) => void
+  handleBuildCompleted: (event: { id: string; status: string; progress: number; message: string; artifacts?: any[]; timestamp: string; configurationId?: string; configuration?: any }) => void
+  handleBuildFailed: (event: { id: string; status: string; message: string; timestamp: string; configurationId?: string; configuration?: any }) => void
+  
   // UI state actions
   setTheme: (theme: 'light' | 'dark' | 'auto') => void
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
   clearError: () => void
-  
-  // WebSocket event handlers
-  handleBuildUpdate: (event: BuildUpdateEvent) => void
   
   // Persistence actions
   hydrate: () => void
@@ -158,13 +161,44 @@ export const useAppStore = create<AppStore>()(
 
         // Build job actions
         addBuildJob: (job) => set((state) => {
-          state.buildJobs.push(job)
+          // Check if build already exists to avoid duplicates
+          const existingIndex = state.buildJobs.findIndex(j => j.id === job.id)
+          if (existingIndex !== -1) {
+            state.buildJobs[existingIndex] = job
+          } else {
+            state.buildJobs.push(job)
+          }
         }),
 
         updateBuildJob: (id, updates) => set((state) => {
           const index = state.buildJobs.findIndex(j => j.id === id)
           if (index !== -1) {
             state.buildJobs[index] = { ...state.buildJobs[index], ...updates }
+          } else {
+            // If build doesn't exist, create it with the updates
+            const newBuild: BuildJob = {
+              id,
+              userId: 'current-user',
+              configurationId: updates.configurationId || 'unknown',
+              configurationSnapshot: {} as ArmbianConfiguration,
+              status: 'queued',
+              progress: {
+                percentage: 0,
+                currentStage: 'Queued'
+              },
+              timing: {
+                queuedAt: new Date().toISOString()
+              },
+              logs: [],
+              artifacts: [],
+              priority: 1,
+              retryCount: 0,
+              maxRetries: 3,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              ...updates
+            }
+            state.buildJobs.push(newBuild)
           }
         }),
 
@@ -185,6 +219,175 @@ export const useAppStore = create<AppStore>()(
           return get().buildJobs.filter(j => activeStatuses.includes(j.status))
         },
 
+        // Socket-based build event handlers
+        handleBuildCreated: (event) => set((state) => {
+          console.log('🏗️ Store: Build created event:', event)
+          
+          // Create a new build job from the event
+          const newBuild: BuildJob = {
+            id: event.id,
+            userId: 'current-user',
+            configurationId: event.configurationId || 'unknown',
+            configurationSnapshot: event.configuration || {} as ArmbianConfiguration,
+            status: event.status as BuildJob['status'],
+            progress: {
+              percentage: 0,
+              currentStage: event.message || 'Queued'
+            },
+            timing: {
+              queuedAt: event.timestamp
+            },
+            logs: [{
+              timestamp: event.timestamp,
+              level: 'info',
+              message: event.message
+            }],
+            artifacts: [],
+            priority: 1,
+            retryCount: 0,
+            maxRetries: 3,
+            createdAt: event.timestamp,
+            updatedAt: event.timestamp
+          }
+          
+          // Add to builds if it doesn't exist
+          const existingIndex = state.buildJobs.findIndex(j => j.id === event.id)
+          if (existingIndex === -1) {
+            state.buildJobs.unshift(newBuild) // Add to beginning for newest first
+          }
+        }),
+
+        handleBuildUpdate: (event) => set((state) => {
+          console.log('🏗️ Store: Build update event:', event)
+          
+          const index = state.buildJobs.findIndex(j => j.id === event.id)
+          if (index !== -1) {
+            // Update existing build
+            const build = state.buildJobs[index]
+            state.buildJobs[index] = {
+              ...build,
+              status: event.status as BuildJob['status'],
+              progress: {
+                percentage: event.progress || build.progress?.percentage || 0,
+                currentStage: event.message || build.progress?.currentStage || 'Building'
+              },
+              timing: {
+                ...build.timing,
+                startedAt: build.timing.startedAt || (event.status !== 'queued' ? event.timestamp : undefined)
+              },
+              logs: [
+                ...build.logs,
+                {
+                  timestamp: event.timestamp,
+                  level: 'info',
+                  message: event.message
+                }
+              ],
+              updatedAt: event.timestamp
+            }
+          } else {
+            // Create new build if it doesn't exist (shouldn't happen, but handle gracefully)
+            const newBuild: BuildJob = {
+              id: event.id,
+              userId: 'current-user',
+              configurationId: 'unknown',
+              configurationSnapshot: {} as ArmbianConfiguration,
+              status: event.status as BuildJob['status'],
+              progress: {
+                percentage: event.progress || 0,
+                currentStage: event.message || 'Building'
+              },
+              timing: {
+                queuedAt: event.timestamp,
+                startedAt: event.status !== 'queued' ? event.timestamp : undefined
+              },
+              logs: [{
+                timestamp: event.timestamp,
+                level: 'info',
+                message: event.message
+              }],
+              artifacts: [],
+              priority: 1,
+              retryCount: 0,
+              maxRetries: 3,
+              createdAt: event.timestamp,
+              updatedAt: event.timestamp
+            }
+            state.buildJobs.unshift(newBuild)
+          }
+        }),
+
+        handleBuildCompleted: (event) => set((state) => {
+          console.log('✅ Store: Build completed event:', event)
+          
+          const index = state.buildJobs.findIndex(j => j.id === event.id)
+          if (index !== -1) {
+            const build = state.buildJobs[index]
+            state.buildJobs[index] = {
+              ...build,
+              status: 'completed',
+              progress: {
+                percentage: 100,
+                currentStage: 'Completed'
+              },
+              timing: {
+                ...build.timing,
+                completedAt: event.timestamp,
+                duration: build.timing.startedAt ? 
+                  Math.floor((new Date(event.timestamp).getTime() - new Date(build.timing.startedAt).getTime()) / 1000) :
+                  undefined
+              },
+              artifacts: event.artifacts || build.artifacts,
+              logs: [
+                ...build.logs,
+                {
+                  timestamp: event.timestamp,
+                  level: 'info',
+                  message: event.message
+                }
+              ],
+              updatedAt: event.timestamp
+            }
+          }
+        }),
+
+        handleBuildFailed: (event) => set((state) => {
+          console.log('❌ Store: Build failed event:', event)
+          
+          const index = state.buildJobs.findIndex(j => j.id === event.id)
+          if (index !== -1) {
+            const build = state.buildJobs[index]
+            state.buildJobs[index] = {
+              ...build,
+              status: 'failed',
+              progress: {
+                percentage: build.progress?.percentage || 0,
+                currentStage: 'Failed'
+              },
+              timing: {
+                ...build.timing,
+                completedAt: event.timestamp,
+                duration: build.timing.startedAt ? 
+                  Math.floor((new Date(event.timestamp).getTime() - new Date(build.timing.startedAt).getTime()) / 1000) :
+                  undefined
+              },
+              error: {
+                code: 'BUILD_FAILED',
+                message: event.message
+              },
+              logs: [
+                ...build.logs,
+                {
+                  timestamp: event.timestamp,
+                  level: 'error',
+                  message: event.message
+                }
+              ],
+              updatedAt: event.timestamp
+            }
+          }
+        }),
+
         // UI state actions
         setTheme: (theme) => set((state) => {
           state.theme = theme
@@ -203,56 +406,6 @@ export const useAppStore = create<AppStore>()(
 
         clearError: () => set((state) => {
           state.error = null
-        }),
-
-        // WebSocket event handlers
-        handleBuildUpdate: (event) => set((state) => {
-          const { buildId, status, progress, logs, artifacts, error } = event.payload
-          const jobIndex = state.buildJobs.findIndex(j => j.id === buildId)
-          
-          if (jobIndex !== -1) {
-            const job = state.buildJobs[jobIndex]
-            
-            // Update status
-            if (status) {
-              job.status = status
-            }
-            
-            // Update progress
-            if (progress) {
-              job.progress = progress
-            }
-            
-            // Append new logs
-            if (logs && logs.length > 0) {
-              job.logs.push(...logs)
-            }
-            
-            // Update artifacts
-            if (artifacts) {
-              job.artifacts = artifacts
-            }
-            
-            // Update error
-            if (error) {
-              job.error = error
-            }
-            
-            // Update timestamp
-            job.updatedAt = new Date().toISOString()
-            
-            // Update timing based on status
-            if (status === 'initializing' && !job.timing.startedAt) {
-              job.timing.startedAt = new Date().toISOString()
-            } else if (['completed', 'failed', 'cancelled'].includes(status) && !job.timing.completedAt) {
-              job.timing.completedAt = new Date().toISOString()
-              if (job.timing.startedAt) {
-                job.timing.duration = Math.floor(
-                  (new Date(job.timing.completedAt).getTime() - new Date(job.timing.startedAt).getTime()) / 1000
-                )
-              }
-            }
-          }
         }),
 
         // Persistence actions
@@ -326,7 +479,10 @@ export const useAppActions = () => useAppStore((state) => ({
   setLoading: state.setLoading,
   setError: state.setError,
   clearError: state.clearError,
+  handleBuildCreated: state.handleBuildCreated,
   handleBuildUpdate: state.handleBuildUpdate,
+  handleBuildCompleted: state.handleBuildCompleted,
+  handleBuildFailed: state.handleBuildFailed,
   reset: state.reset,
 }))
 

@@ -12,15 +12,17 @@ import {
 } from '@ant-design/icons'
 import { FlexLayoutFactory } from '@/layouts/FlexLayoutFactory'
 import { useAppStore } from '@/stores/app'
-import { ArmbianConfiguration } from '@/types'
+import { ArmbianConfiguration, BuildJob } from '@/types'
 import { colors } from '@/styles/design-tokens'
-import { useSocket, BuildStatus } from '@/hooks/useSocket'
+import { useSocketService, BuildStatus } from '@/services/socketService'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ConnectionStatusCompact } from '@/components/ConnectionStatus'
 import WelcomePanel from '@/panels/WelcomePanel'
 import ArmbianConfigEditor from '@/panels/ArmbianConfigEditor'
 import BuildStatusPanel from '@/panels/BuildStatusPanel'
 import FileExplorerPanel from '@/panels/FileExplorerPanel'
+import BuildsPanel from '@/panels/BuildsPanel'
+import BuildViewer from '@/panels/BuildViewer'
 import 'flexlayout-react/style/light.css'
 import './App.css'
 
@@ -33,7 +35,6 @@ interface AppProps {
 const App: React.FC<AppProps> = ({ theme = 'light' }) => {
   const [model, setModel] = useState<Model | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const [buildStatuses, setBuildStatuses] = useState<BuildStatus[]>([])
   const [selectedConfig, setSelectedConfig] = useState<ArmbianConfiguration | null>(null)
   
   // Zustand store
@@ -41,65 +42,137 @@ const App: React.FC<AppProps> = ({ theme = 'light' }) => {
     setLayout,
     saveLayout,
     loadLayout,
-    configurations
+    configurations,
+    buildJobs,
+    setBuildJobs,
+    handleBuildCreated, 
+    handleBuildUpdate, 
+    handleBuildCompleted, 
+    handleBuildFailed
   } = useAppStore()
 
   // Get current configuration - use selected config or fall back to first one
   const currentConfig = selectedConfig || (configurations.length > 0 ? configurations[0] : null)
 
   // Socket.io integration for real-time communication
-  const { emit } = useSocket({
-    autoConnect: true,
-    onBuildUpdate: useCallback((build: BuildStatus) => {
-      console.log('🏗️ Build update received:', build);
-      
-      setBuildStatuses(prev => {
-        const existingIndex = prev.findIndex(b => b.id === build.id);
-        if (existingIndex >= 0) {
-          // Update existing build
-          const updated = [...prev];
-          updated[existingIndex] = build;
-          return updated;
-        } else {
-          // Add new build
-          return [...prev, build];
-        }
-      });
+  const socketService = useSocketService()
 
-      // Show notifications for important build status changes
-      if (build.status === 'completed') {
-        notification.success({
-          message: 'Build Completed',
-          description: `Build ${build.id} completed successfully`,
-          placement: 'topRight'
-        });
-      } else if (build.status === 'failed') {
-        notification.error({
-          message: 'Build Failed',
-          description: `Build ${build.id} failed: ${build.message}`,
-          placement: 'topRight'
-        });
+  // Initial data loading
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        // Fetch existing builds from backend
+        const response = await fetch('/api/builds')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.builds && Array.isArray(data.builds)) {
+            console.log('📂 Loaded', data.builds.length, 'existing builds from backend')
+            
+            // Convert backend build format to frontend BuildJob format
+            const buildJobs: BuildJob[] = data.builds.map((build: any) => ({
+              id: build.id,
+              userId: build.userId || 'default-user',
+              configurationId: build.configurationId || 'unknown',
+              configurationSnapshot: build.configurationSnapshot || {},
+              status: build.status,
+              progress: {
+                percentage: build.progress || 0,
+                currentStage: build.message || build.buildPhase || 'Unknown'
+              },
+              timing: {
+                queuedAt: build.createdAt,
+                startedAt: build.startedAt,
+                completedAt: build.completedAt
+              },
+              logs: build.logs || [],
+              artifacts: build.artifacts || [],
+              priority: 1,
+              retryCount: 0,
+              maxRetries: 3,
+              createdAt: build.createdAt,
+              updatedAt: build.lastUpdated || build.updatedAt
+            }))
+            
+            // Update store with existing builds
+            setBuildJobs(buildJobs)
+          }
+        } else {
+          console.warn('Failed to fetch builds:', response.statusText)
+        }
+      } catch (error) {
+        console.error('Error loading initial builds:', error)
       }
-    }, []),
-    onStatusChange: useCallback((status: 'connected' | 'disconnected' | 'error', errorMsg?: string) => {
-      console.log('🔌 Connection status changed:', status, errorMsg);
+    }
+
+    loadInitialData()
+  }, [setBuildJobs])
+
+  // Setup socket event handlers for build events to route to store
+  useEffect(() => {
+    const handleBuildEvent = (build: BuildStatus) => {
+      console.log('🔌 App: Socket build event received:', build)
       
-      if (status === 'connected') {
-        notification.success({
-          message: 'Connected to Backend',
-          description: 'Real-time communication established',
-          placement: 'topRight',
-          duration: 3
-        });
-      } else if (status === 'error') {
-        notification.error({
-          message: 'Connection Error',
-          description: errorMsg || 'Failed to connect to backend',
-          placement: 'topRight'
-        });
+      // Route different socket events to appropriate store handlers
+      if (build.status === 'queued' && build.progress === 0) {
+        // This is likely a new build
+        handleBuildCreated({
+          id: build.id,
+          status: build.status,
+          message: build.message,
+          timestamp: build.timestamp,
+          configurationId: build.configurationId,
+          configuration: build.configuration
+        })
+      } else if (build.status === 'completed') {
+        // Build completed
+        handleBuildCompleted({
+          id: build.id,
+          status: build.status,
+          progress: build.progress,
+          message: build.message,
+          timestamp: build.timestamp,
+          artifacts: (build as any).artifacts // Type assertion for artifacts
+        })
+      } else if (build.status === 'failed' || build.status === 'cancelled') {
+        // Build failed
+        handleBuildFailed({
+          id: build.id,
+          status: build.status,
+          message: build.message,
+          timestamp: build.timestamp
+        })
+      } else {
+        // Regular build update
+        handleBuildUpdate({
+          id: build.id,
+          status: build.status,
+          progress: build.progress,
+          message: build.message,
+          timestamp: build.timestamp
+        })
       }
-    }, [])
-  })
+    }
+
+    const handleStatusChange = (data: { connected: boolean; reason?: string }) => {
+      console.log('🔌 App: Socket status changed:', data)
+    }
+
+    // Subscribe to socket events
+    const unsubscribeCreated = socketService.on('build:created', handleBuildEvent)
+    const unsubscribeUpdate = socketService.on('build:update', handleBuildEvent)
+    const unsubscribeCompleted = socketService.on('build:completed', handleBuildEvent)
+    const unsubscribeFailed = socketService.on('build:failed', handleBuildEvent)
+    const unsubscribeStatus = socketService.on('connection:status', handleStatusChange)
+
+    // Cleanup subscriptions
+    return () => {
+      unsubscribeCreated()
+      unsubscribeUpdate()
+      unsubscribeCompleted()
+      unsubscribeFailed()
+      unsubscribeStatus()
+    }
+  }, [socketService, handleBuildCreated, handleBuildUpdate, handleBuildCompleted, handleBuildFailed])
 
   // Initialize FlexLayout model
   useEffect(() => {
@@ -118,6 +191,44 @@ const App: React.FC<AppProps> = ({ theme = 'light' }) => {
     setLayout(newLayout as any)
     saveLayout('default', newLayout as any)
   }, [setLayout, saveLayout])
+
+  // Function to add a build viewer tab
+  const openBuildViewer = useCallback((build: BuildJob) => {
+    if (!model) return
+
+    const tabId = `build-viewer-${build.id}`
+    const tabName = `Build ${build.id.slice(0, 8)}`
+    
+    // Check if tab already exists
+    const existingNode = model.getNodeById(tabId)
+    if (existingNode) {
+      // Tab already exists, just select it
+      model.doAction({
+        type: 'FlexLayout_SelectTab',
+        data: { node: tabId }
+      } as any)
+      return
+    }
+
+    // Create new tab in the main editor group
+    const editorGroup = model.getNodeById('editor-group')
+    if (editorGroup) {
+      model.doAction({
+        type: 'FlexLayout_AddNode',
+        data: {
+          json: {
+            id: tabId,
+            type: 'tab',
+            name: tabName,
+            component: 'BuildViewer',
+            config: { buildId: build.id },
+            enableClose: true
+          },
+          toNode: 'editor-group'
+        }
+      } as any)
+    }
+  }, [model])
 
   // Component factory for rendering panels
   const factory = useCallback((node: TabNode) => {
@@ -198,26 +309,34 @@ const App: React.FC<AppProps> = ({ theme = 'light' }) => {
       case 'BuildStatusPanel':
         return (
           <BuildStatusPanel
-            builds={buildStatuses}
+            builds={buildJobs.map(job => ({
+              id: job.id,
+              status: job.status,
+              progress: job.progress?.percentage || 0,
+              message: job.progress?.currentStage || job.status,
+              timestamp: job.updatedAt || job.createdAt,
+              startTime: job.timing.startedAt,
+              endTime: job.timing.completedAt
+            }))}
             onViewLogs={(buildId) => {
               console.log('View logs for:', buildId)
-              // Emit request for build logs
-              emit('build:getLogs', { buildId })
+              // Send request for build logs
+              socketService.send('build:getLogs', { buildId })
             }}
             onDownloadArtifact={(buildId, artifactId) => {
               console.log('Download artifact:', { buildId, artifactId })
-              // Emit request for artifact download
-              emit('build:downloadArtifact', { buildId, artifactId })
+              // Send request for artifact download
+              socketService.send('build:downloadArtifact', { buildId, artifactId })
             }}
             onCancelBuild={(buildId) => {
               console.log('Cancel build:', buildId)
-              // Emit build cancellation request
-              emit('build:cancel', { buildId })
+              // Send build cancellation request
+              socketService.send('build:cancel', { buildId })
             }}
             onRefresh={() => {
               console.log('Refreshing build status...')
-              // Emit request for latest build status
-              emit('build:refresh')
+              // Send request for latest build status
+              socketService.send('build:refresh')
             }}
           />
         )
@@ -295,8 +414,45 @@ const App: React.FC<AppProps> = ({ theme = 'light' }) => {
           />
         )
       
-      case 'SearchPanel':
-        return <div className="p-4">Search Panel - Coming Soon</div>
+      case 'BuildsPanel':
+        return (
+          <BuildsPanel
+            onBuildSelect={(build: BuildJob) => {
+              console.log('Build selected:', build.id)
+              openBuildViewer(build)
+            }}
+            onBuildDoubleClick={(build: BuildJob) => {
+              console.log('Build double-clicked:', build.id)
+              openBuildViewer(build)
+            }}
+            onArtifactDownload={(buildId: string, artifactName: string) => {
+              console.log('Download artifact:', { buildId, artifactName })
+              
+              // Create download URL and trigger download
+              const downloadUrl = `/api/builds/${buildId}/artifacts/${encodeURIComponent(artifactName)}`
+              const link = document.createElement('a')
+              link.href = downloadUrl
+              link.download = artifactName
+              document.body.appendChild(link)
+              link.click()
+              document.body.removeChild(link)
+              
+              notification.success({
+                message: 'Download Started',
+                description: `Downloading ${artifactName}`,
+                placement: 'topRight'
+              })
+            }}
+            onViewLogs={(buildId: string) => {
+              console.log('View logs for build:', buildId)
+              // TODO: Open logs panel or modal
+            }}
+            onCancelBuild={(buildId: string) => {
+              console.log('Cancel build:', buildId)
+              // TODO: Implement build cancellation
+            }}
+          />
+        )
       
       case 'SourceControlPanel':
         return <div className="p-4">Source Control Panel - Coming Soon</div>
@@ -336,6 +492,46 @@ const App: React.FC<AppProps> = ({ theme = 'light' }) => {
       
       case 'ArtifactsPanel':
         return <div className="p-4">Artifacts Panel - Coming Soon</div>
+
+      case 'BuildViewer':
+        const buildId = node.getConfig()?.buildId
+        if (!buildId) {
+          return <div className="p-4">Error: No build ID provided</div>
+        }
+        
+        // Find the build from buildJobs
+        const build = buildJobs.find(b => b.id === buildId)
+        if (!build) {
+          return <div className="p-4">Build not found: {buildId}</div>
+        }
+        
+        return (
+          <BuildViewer
+            build={build}
+            onDownloadArtifact={(buildId: string, artifactName: string) => {
+              console.log('Download artifact:', { buildId, artifactName })
+              
+              // Create download URL and trigger download
+              const downloadUrl = `/api/builds/${buildId}/artifacts/${encodeURIComponent(artifactName)}`
+              const link = document.createElement('a')
+              link.href = downloadUrl
+              link.download = artifactName
+              document.body.appendChild(link)
+              link.click()
+              document.body.removeChild(link)
+              
+              notification.success({
+                message: 'Download Started',
+                description: `Downloading ${artifactName}`,
+                placement: 'topRight'
+              })
+            }}
+            onViewArtifact={(buildId: string, artifactName: string) => {
+              console.log('View artifact:', { buildId, artifactName })
+              // TODO: Implement artifact viewer
+            }}
+          />
+        )
 
       default:
         return <div className="p-4">Unknown Panel: {component}</div>

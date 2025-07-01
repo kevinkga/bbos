@@ -1,12 +1,12 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react'
 import { Card, Button, Typography, Space, Divider, message, Modal, Tabs, Steps, Progress, Row, Col, Alert } from 'antd'
-import { SaveOutlined, SettingOutlined, InfoCircleOutlined, ReloadOutlined, DeleteOutlined, ArrowLeftOutlined, ArrowRightOutlined, CheckCircleOutlined, FormOutlined } from '@ant-design/icons'
+import { SaveOutlined, SettingOutlined, InfoCircleOutlined, ReloadOutlined, DeleteOutlined, ArrowLeftOutlined, ArrowRightOutlined, CheckCircleOutlined, FormOutlined, ExclamationCircleOutlined, ClockCircleOutlined, CompassOutlined } from '@ant-design/icons'
 import Form from '@rjsf/antd'
 import validator from '@rjsf/validator-ajv8'
 import { RJSFSchema, ErrorSchema, UiSchema } from '@rjsf/utils'
 import { ArmbianConfiguration } from '@/types'
 import { colors, components, spacing } from '@/styles/design-tokens'
-import { useSocket } from '@/hooks/useSocket'
+import { useSocketService } from '@/services/socketService'
 
 const { Title, Text } = Typography
 const { TabPane } = Tabs
@@ -54,10 +54,60 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
   const [isValid, setIsValid] = useState(true)
   const [errors, setErrors] = useState<ErrorSchema>({})
   const [stepValidation, setStepValidation] = useState<boolean[]>([])
-  const { emit, connected } = useSocket({
-    onBuildUpdate: (build) => {
+  const socketService = useSocketService();
+  const [buildModalOpen, setBuildModalOpen] = useState(false)
+  const [buildLog, setBuildLog] = useState('')
+  const [buildProgress, setBuildProgress] = useState(0)
+  const [buildStatus, setBuildStatus] = useState<'pending'|'building'|'completed'|'failed'>('pending')
+  const [currentBuildId, setCurrentBuildId] = useState<string | null>(null)
+
+  // Helper function to reset build state
+  const resetBuildState = useCallback(() => {
+    setBuildProgress(0)
+    setBuildStatus('pending')
+    setBuildLog('')
+    setCurrentBuildId(null)
+  }, [])
+
+  // Socket event handlers for build updates
+  useEffect(() => {
+    const handleBuildSubmitted = (response: any) => {
+      console.log('Build submitted successfully:', response);
+      setCurrentBuildId(response.buildId);
+      
+      const timestamp = new Date().toLocaleTimeString();
+      setBuildLog((prev) => {
+        const queueInfo = response.queuePosition > 0 
+          ? `\n[${timestamp}] ⏳ Build queued (position: ${response.queuePosition}, estimated wait: ${response.estimatedWaitTime} min)`
+          : `\n[${timestamp}] 🚀 Build started immediately`;
+        return `${prev}${queueInfo}`;
+      });
+      
+      setBuildStatus('pending');
+      message.success('Build submitted successfully!');
+    };
+
+    const handleBuildUpdate = (build: any) => {
       console.log('Build update received:', build);
-      setBuildLog((prev) => prev + `\n[${new Date(build.timestamp).toLocaleTimeString()}] ${build.message}`)
+      
+      // If this is the first build event (no current build ID), use this build's ID
+      if (!currentBuildId) {
+        console.log('Setting build ID from backend:', build.id);
+        setCurrentBuildId(build.id);
+      }
+      // Only process events for the current build
+      else if (build.id !== currentBuildId) {
+        console.log('Ignoring build event for different build:', build.id, 'current:', currentBuildId);
+        return;
+      }
+      
+      // Add new log entry (don't accumulate from previous logs)
+      const timestamp = new Date(build.timestamp || Date.now()).toLocaleTimeString();
+      setBuildLog((prev) => {
+        const newEntry = `[${timestamp}] ${build.message}`;
+        return prev ? `${prev}\n${newEntry}` : newEntry;
+      });
+      
       setBuildProgress(build.progress || 0)
       
       // Map backend status to frontend status
@@ -65,6 +115,7 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
         'queued': 'pending',
         'initializing': 'building',
         'downloading': 'building',
+        'configuring': 'building',
         'building': 'building', 
         'packaging': 'building',
         'uploading': 'building',
@@ -73,17 +124,53 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
         'cancelled': 'failed'
       };
       
-      setBuildStatus(statusMap[build.status] || 'building')
+      const newStatus = statusMap[build.status] || 'building';
+      setBuildStatus(newStatus);
       
-      if (build.status === 'completed' || build.status === 'failed') {
-        setTimeout(() => setBuildModalOpen(false), 3000)
+      // Handle completion or failure
+      if (build.status === 'completed') {
+        setBuildLog((prev) => `${prev}\n[${new Date().toLocaleTimeString()}] ✅ Build completed successfully!`)
+        setTimeout(() => {
+          setBuildModalOpen(false)
+          // Reset build state
+          resetBuildState()
+        }, 2000)
+      } else if (build.status === 'failed' || build.status === 'cancelled') {
+        setBuildLog((prev) => `${prev}\n[${new Date().toLocaleTimeString()}] ❌ Build ${build.status}: ${build.message}`)
+        setTimeout(() => {
+          setBuildModalOpen(false)
+          // Reset build state
+          resetBuildState()
+        }, 3000)
       }
-    }
-  });
-  const [buildModalOpen, setBuildModalOpen] = useState(false)
-  const [buildLog, setBuildLog] = useState('')
-  const [buildProgress, setBuildProgress] = useState(0)
-  const [buildStatus, setBuildStatus] = useState<'pending'|'building'|'completed'|'failed'>('pending')
+    };
+
+    const handleBuildError = (error: any) => {
+      console.error('Build error received:', error);
+      const timestamp = new Date().toLocaleTimeString();
+      setBuildLog((prev) => `${prev}\n[${timestamp}] ❌ Error: ${error.error}`);
+      setBuildStatus('failed');
+      message.error(error.error || 'Build submission failed');
+    };
+
+    // Subscribe to socket events
+    const unsubscribeSubmitted = socketService.on('build:submitted', handleBuildSubmitted);
+    const unsubscribeUpdate = socketService.on('build:update', handleBuildUpdate);
+    const unsubscribeCompleted = socketService.on('build:completed', handleBuildUpdate);
+    const unsubscribeFailed = socketService.on('build:failed', handleBuildUpdate);
+    const unsubscribeCancelled = socketService.on('build:cancelled', handleBuildUpdate);
+    const unsubscribeError = socketService.on('build:error', handleBuildError);
+
+    // Cleanup subscriptions
+    return () => {
+      unsubscribeSubmitted();
+      unsubscribeUpdate();
+      unsubscribeCompleted();
+      unsubscribeFailed();
+      unsubscribeCancelled();
+      unsubscribeError();
+    };
+  }, [currentBuildId, resetBuildState, socketService])
 
   // Update form data when initialConfig changes (when a different configuration is selected)
   useEffect(() => {
@@ -823,13 +910,16 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
 
   // Build handler
   const handleBuild = useCallback(() => {
-    setBuildLog('')
-    setBuildProgress(0)
-    setBuildStatus('pending')
+    // Reset build state completely for new build
+    resetBuildState()
     setBuildModalOpen(true)
-    emit('build:start', { config: formData });
+    
+    setBuildLog(`[${new Date().toLocaleTimeString()}] 🚀 Starting new build...`)
+    setBuildStatus('pending')
+    
+    socketService.send('build:submit', { configuration: formData, userId: 'default-user' });
     message.loading('Build started...');
-  }, [emit, formData]);
+  }, [socketService, formData, resetBuildState]);
 
   // Render wizard content
   const renderWizardContent = () => {
@@ -1460,20 +1550,74 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
       {/* Build Modal */}
       <Modal
         open={buildModalOpen}
-        onCancel={() => setBuildModalOpen(false)}
+        onCancel={() => {
+          setBuildModalOpen(false)
+          resetBuildState()
+        }}
         footer={null}
-        title="Remote Build Progress"
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {buildStatus === 'completed' ? (
+              <CheckCircleOutlined style={{ color: colors.success[500] }} />
+            ) : buildStatus === 'failed' ? (
+              <ExclamationCircleOutlined style={{ color: colors.error[500] }} />
+            ) : (
+              <ClockCircleOutlined style={{ color: colors.accent[500] }} />
+            )}
+            <span>Remote Build Progress</span>
+            {buildStatus === 'completed' && (
+              <Text style={{ color: colors.success[600], fontSize: '14px', fontWeight: 'normal' }}>
+                - Completed Successfully!
+              </Text>
+            )}
+            {buildStatus === 'failed' && (
+              <Text style={{ color: colors.error[600], fontSize: '14px', fontWeight: 'normal' }}>
+                - Build Failed
+              </Text>
+            )}
+          </div>
+        }
         width={700}
         bodyStyle={{ background: colors.background.secondary }}
         destroyOnClose
       >
         <div style={{ fontFamily: 'JetBrains Mono, monospace', background: colors.background.tertiary, borderRadius: 6, padding: 16, minHeight: 240, maxHeight: 400, overflowY: 'auto', fontSize: 14, color: colors.text.primary }}>
-          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{buildLog || 'Waiting for build output...'}</pre>
+          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+            {buildLog || 'Waiting for build output...'}
+          </pre>
         </div>
         <div style={{ marginTop: 16 }}>
-          <Progress percent={buildProgress} status={buildStatus === 'failed' ? 'exception' : buildStatus === 'completed' ? 'success' : 'active'} />
-          <div style={{ marginTop: 8, color: buildStatus === 'failed' ? colors.error[600] : buildStatus === 'completed' ? colors.success[600] : colors.text.secondary }}>
-            {buildStatus === 'failed' ? 'Build failed.' : buildStatus === 'completed' ? 'Build completed!' : 'Building...'}
+          <Progress 
+            percent={buildProgress} 
+            status={buildStatus === 'failed' ? 'exception' : buildStatus === 'completed' ? 'success' : 'active'} 
+            strokeColor={
+              buildStatus === 'completed' ? colors.success[500] :
+              buildStatus === 'failed' ? colors.error[500] :
+              colors.accent[500]
+            }
+          />
+          <div style={{ 
+            marginTop: 8, 
+            color: buildStatus === 'failed' ? colors.error[600] : buildStatus === 'completed' ? colors.success[600] : colors.text.secondary,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <span>
+              {buildStatus === 'failed' ? 'Build failed.' : 
+               buildStatus === 'completed' ? 'Build completed successfully!' : 
+               'Building...'}
+            </span>
+            {buildStatus === 'completed' && (
+              <Text style={{ color: colors.text.tertiary, fontSize: '12px' }}>
+                Modal will close automatically in 2 seconds
+              </Text>
+            )}
+            {buildStatus === 'failed' && (
+              <Text style={{ color: colors.text.tertiary, fontSize: '12px' }}>
+                Modal will close automatically in 3 seconds
+              </Text>
+            )}
           </div>
         </div>
       </Modal>

@@ -1,0 +1,793 @@
+{
+  "builds": {
+    "b32effe6-cf64-4697-8314-f05527cd61d1": {
+      "id": "b32effe6-cf64-4697-8314-f05527cd61d1",
+      "configurationId": "fa6f4e69-dbb0-4863-a720-b488921f092f",
+      "userId": "default-user",
+      "status": "completed",
+      "progress": 100,
+      "message": "Build completed successfully",
+      "createdAt": "2025-07-01T23:24:05.848Z",
+      "configuration": {
+        "name": "rock5b",
+        "description": "Radxa Rock 5B",
+        "board": {
+          "family": "rockchip64",
+          "name": "rock-5b",
+          "architecture": "arm64"
+        },
+        "distribution": {
+          "release": "bookworm",
+          "type": "minimal"
+        },
+        "network": {
+          "hostname": "rock5b",
+          "wifi": {
+            "enabled": true,
+            "ssid": "infectious",
+            "psk": "bubblegum",
+            "country": "GB"
+          }
+        },
+        "users": [
+          {
+            "username": "kaubeelack",
+            "password": "aloha28395",
+            "sudo": true,
+            "shell": "/bin/bash"
+          }
+        ],
+        "ssh": {
+          "enabled": true,
+          "port": 22,
+          "passwordAuth": true,
+          "rootLogin": true
+        },
+        "packages": {
+          "install": [],
+          "remove": []
+        },
+        "id": "fa6f4e69-dbb0-4863-a720-b488921f092f",
+        "userId": "current-user",
+        "createdAt": "2025-07-01T23:05:29.217Z",
+        "updatedAt": "2025-07-01T23:05:29.217Z",
+        "version": 1
+      },
+      "startedAt": "2025-07-01T23:24:05.848Z",
+      "completedAt": "2025-07-01T23:24:05.861Z"
+    },
+    "2e366ace-d198-48af-916b-10a9d3546930": {
+      "id": "2e366ace-d198-48af-916b-10a9d3546930",
+      "configurationId": "fa6f4e69-dbb0-4863-a720-b488921f092f",
+      "userId": "default-user",
+      "status": "completed",
+      "progress": 100,
+      "message": "Build completed successfully",
+      "createdAt": "2025-07-01T23:24:09.849Z",
+      "configuration": {
+        "name": "rock5b",
+        "description": "Radxa Rock 5B",
+        "board": {
+          "family": "rockchip64",
+          "name": "rock-5b",
+          "architecture": "arm64"
+        },
+        "distribution": {
+          "release": "bookworm",
+          "type": "minimal"
+        },
+        "network": {
+          "hostname": "rock5b",
+          "wifi": {
+            "enabled": true,
+            "ssid": "infectious",
+            "psk": "bubblegum",
+            "country": "GB"
+          }
+        },
+        "users": [
+          {
+            "username": "kaubeelack",
+            "password": "aloha28395",
+            "sudo": true,
+            "shell": "/bin/bash"
+          }
+        ],
+        "ssh": {
+          "enabled": true,
+          "port": 22,
+          "passwordAuth": true,
+          "rootLogin": true
+        },
+        "packages": {
+          "install": [],
+          "remove": []
+        },
+        "id": "fa6f4e69-dbb0-4863-a720-b488921f092f",
+        "userId": "current-user",
+        "createdAt": "2025-07-01T23:05:29.217Z",
+        "updatedAt": "2025-07-01T23:05:29.217Z",
+        "version": 1
+      },
+      "startedAt": "2025-07-01T23:24:09.850Z",
+      "completedAt": "2025-07-01T23:24:09.867Z"
+    },
+    "ae9f3798-6089-4806-b54d-0a8c37221a84": {
+      "id": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+      "configurationId": "test-persistence",
+      "userId": "test-user",
+      "status": "completed",
+      "progress": 100,
+      "message": "Build completed successfully",
+      "createdAt": "2025-07-01T23:25:49.995Z",
+      "configuration": {
+        "id": "test-persistence",
+        "name": "Test Build Persistence",
+        "board": {
+          "family": "broadcom",
+          "name": "rpi4b",
+          "architecture": "arm64"
+        },
+        "distribution": {
+          "release": "bookworm",
+          "type": "minimal"
+        }
+      },
+      "startedAt": "2025-07-01T23:25:49.996Z",
+      "completedAt": "2025-07-01T23:25:50.009Z"
+    }
+  },
+  "artifacts": {
+    "b32effe6-cf64-4697-8314-f05527cd61d1": [
+      {
+        "id": "7e47d040-f74e-4dac-b4fa-40e413fa327c",
+        "name": "BBOS_Armbian_b32effe6-cf64-4697-8314-f05527cd61d1.img",
+        "type": "image",
+        "size": 0,
+        "path": "/tmp/bbos-builds/b32effe6-cf64-4697-8314-f05527cd61d1/output/BBOS_Armbian_b32effe6-cf64-4697-8314-f05527cd61d1.img",
+        "url": "/api/builds/b32effe6-cf64-4697-8314-f05527cd61d1/artifacts/BBOS_Armbian_b32effe6-cf64-4697-8314-f05527cd61d1.img",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "createdAt": "2025-07-01T23:24:05.861Z"
+      },
+      {
+        "id": "85e1616a-219c-4f3c-ab31-fd302c21fd92",
+        "name": "armbian-config-auto.sh",
+        "type": "log",
+        "size": 429,
+        "path": "/tmp/bbos-builds/b32effe6-cf64-4697-8314-f05527cd61d1/armbian-config-auto.sh",
+        "url": "/api/builds/b32effe6-cf64-4697-8314-f05527cd61d1/artifacts/armbian-config-auto.sh",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "createdAt": "2025-07-01T23:24:05.861Z"
+      },
+      {
+        "id": "80d9437d-946d-4834-9146-5f252fa132f3",
+        "name": "user-data",
+        "type": "log",
+        "size": 519,
+        "path": "/tmp/bbos-builds/b32effe6-cf64-4697-8314-f05527cd61d1/user-data",
+        "url": "/api/builds/b32effe6-cf64-4697-8314-f05527cd61d1/artifacts/user-data",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "createdAt": "2025-07-01T23:24:05.861Z"
+      },
+      {
+        "id": "252d34fc-7a21-4a1d-968b-d4bcbf9afac3",
+        "name": "meta-data",
+        "type": "log",
+        "size": 63,
+        "path": "/tmp/bbos-builds/b32effe6-cf64-4697-8314-f05527cd61d1/meta-data",
+        "url": "/api/builds/b32effe6-cf64-4697-8314-f05527cd61d1/artifacts/meta-data",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "createdAt": "2025-07-01T23:24:05.861Z"
+      },
+      {
+        "id": "396aab94-1273-4e46-bf96-910a17eb7df8",
+        "name": "config.json",
+        "type": "config",
+        "size": 869,
+        "path": "/tmp/bbos-builds/b32effe6-cf64-4697-8314-f05527cd61d1/config.json",
+        "url": "/api/builds/b32effe6-cf64-4697-8314-f05527cd61d1/artifacts/config.json",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "createdAt": "2025-07-01T23:24:05.861Z"
+      },
+      {
+        "id": "d7b22690-f6b5-447e-9a5a-7c167abe7f06",
+        "name": "config/DEPLOYMENT.md",
+        "type": "log",
+        "size": 2113,
+        "path": "/tmp/bbos-builds/b32effe6-cf64-4697-8314-f05527cd61d1/output/configurations/DEPLOYMENT.md",
+        "url": "/api/builds/b32effe6-cf64-4697-8314-f05527cd61d1/artifacts/config/DEPLOYMENT.md",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "createdAt": "2025-07-01T23:24:05.861Z"
+      },
+      {
+        "id": "e92e6854-18cb-484c-9131-b6a61c5dded4",
+        "name": "config/bbos-firstrun.service",
+        "type": "log",
+        "size": 224,
+        "path": "/tmp/bbos-builds/b32effe6-cf64-4697-8314-f05527cd61d1/output/configurations/bbos-firstrun.service",
+        "url": "/api/builds/b32effe6-cf64-4697-8314-f05527cd61d1/artifacts/config/bbos-firstrun.service",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "createdAt": "2025-07-01T23:24:05.861Z"
+      },
+      {
+        "id": "fc6fef58-118a-4d8b-8aff-c567fbf7cec2",
+        "name": "config/armbian-config-auto.sh",
+        "type": "log",
+        "size": 429,
+        "path": "/tmp/bbos-builds/b32effe6-cf64-4697-8314-f05527cd61d1/output/configurations/armbian-config-auto.sh",
+        "url": "/api/builds/b32effe6-cf64-4697-8314-f05527cd61d1/artifacts/config/armbian-config-auto.sh",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "createdAt": "2025-07-01T23:24:05.861Z"
+      },
+      {
+        "id": "8077dd45-e1f5-4512-9b3e-bb4092c8f4b8",
+        "name": "config/user-data",
+        "type": "log",
+        "size": 519,
+        "path": "/tmp/bbos-builds/b32effe6-cf64-4697-8314-f05527cd61d1/output/configurations/user-data",
+        "url": "/api/builds/b32effe6-cf64-4697-8314-f05527cd61d1/artifacts/config/user-data",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "createdAt": "2025-07-01T23:24:05.861Z"
+      },
+      {
+        "id": "76ec3237-3f4a-4c37-ae35-d5fa18222fb2",
+        "name": "config/meta-data",
+        "type": "log",
+        "size": 63,
+        "path": "/tmp/bbos-builds/b32effe6-cf64-4697-8314-f05527cd61d1/output/configurations/meta-data",
+        "url": "/api/builds/b32effe6-cf64-4697-8314-f05527cd61d1/artifacts/config/meta-data",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "createdAt": "2025-07-01T23:24:05.861Z"
+      },
+      {
+        "id": "2fa038b7-6443-43c2-b55d-d84c5f0e3d46",
+        "name": "config/config.json",
+        "type": "config",
+        "size": 869,
+        "path": "/tmp/bbos-builds/b32effe6-cf64-4697-8314-f05527cd61d1/output/configurations/config.json",
+        "url": "/api/builds/b32effe6-cf64-4697-8314-f05527cd61d1/artifacts/config/config.json",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "createdAt": "2025-07-01T23:24:05.861Z"
+      },
+      {
+        "id": "f21427a1-b4bb-48eb-aa0f-42300f86bc21",
+        "name": "BBOS_Armbian_b32effe6-cf64-4697-8314-f05527cd61d1.img.sha256",
+        "type": "checksum",
+        "size": 116,
+        "path": "/tmp/bbos-builds/b32effe6-cf64-4697-8314-f05527cd61d1/output/BBOS_Armbian_b32effe6-cf64-4697-8314-f05527cd61d1.img.sha256",
+        "url": "/api/builds/b32effe6-cf64-4697-8314-f05527cd61d1/artifacts/BBOS_Armbian_b32effe6-cf64-4697-8314-f05527cd61d1.img.sha256",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "createdAt": "2025-07-01T23:24:05.861Z"
+      }
+    ],
+    "2e366ace-d198-48af-916b-10a9d3546930": [
+      {
+        "id": "0ad47d9a-c61d-4b64-9e1d-9f3cf5563b3e",
+        "name": "BBOS_Armbian_2e366ace-d198-48af-916b-10a9d3546930.img",
+        "type": "image",
+        "size": 0,
+        "path": "/tmp/bbos-builds/2e366ace-d198-48af-916b-10a9d3546930/output/BBOS_Armbian_2e366ace-d198-48af-916b-10a9d3546930.img",
+        "url": "/api/builds/2e366ace-d198-48af-916b-10a9d3546930/artifacts/BBOS_Armbian_2e366ace-d198-48af-916b-10a9d3546930.img",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "createdAt": "2025-07-01T23:24:09.867Z"
+      },
+      {
+        "id": "7d937310-1179-485a-810b-a82982a2c6fe",
+        "name": "armbian-config-auto.sh",
+        "type": "log",
+        "size": 429,
+        "path": "/tmp/bbos-builds/2e366ace-d198-48af-916b-10a9d3546930/armbian-config-auto.sh",
+        "url": "/api/builds/2e366ace-d198-48af-916b-10a9d3546930/artifacts/armbian-config-auto.sh",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "createdAt": "2025-07-01T23:24:09.867Z"
+      },
+      {
+        "id": "db0ee481-ea4b-4079-b123-212205680a59",
+        "name": "user-data",
+        "type": "log",
+        "size": 519,
+        "path": "/tmp/bbos-builds/2e366ace-d198-48af-916b-10a9d3546930/user-data",
+        "url": "/api/builds/2e366ace-d198-48af-916b-10a9d3546930/artifacts/user-data",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "createdAt": "2025-07-01T23:24:09.867Z"
+      },
+      {
+        "id": "a7c5fbb8-a184-4c3c-9508-1f1ff8d7b6c7",
+        "name": "meta-data",
+        "type": "log",
+        "size": 63,
+        "path": "/tmp/bbos-builds/2e366ace-d198-48af-916b-10a9d3546930/meta-data",
+        "url": "/api/builds/2e366ace-d198-48af-916b-10a9d3546930/artifacts/meta-data",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "createdAt": "2025-07-01T23:24:09.867Z"
+      },
+      {
+        "id": "daf42eda-d847-42ec-ab71-b4eb51e578bf",
+        "name": "config.json",
+        "type": "config",
+        "size": 869,
+        "path": "/tmp/bbos-builds/2e366ace-d198-48af-916b-10a9d3546930/config.json",
+        "url": "/api/builds/2e366ace-d198-48af-916b-10a9d3546930/artifacts/config.json",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "createdAt": "2025-07-01T23:24:09.867Z"
+      },
+      {
+        "id": "0a3fe9c3-fe10-41ec-8b49-f771efc79360",
+        "name": "config/DEPLOYMENT.md",
+        "type": "log",
+        "size": 2113,
+        "path": "/tmp/bbos-builds/2e366ace-d198-48af-916b-10a9d3546930/output/configurations/DEPLOYMENT.md",
+        "url": "/api/builds/2e366ace-d198-48af-916b-10a9d3546930/artifacts/config/DEPLOYMENT.md",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "createdAt": "2025-07-01T23:24:09.867Z"
+      },
+      {
+        "id": "86a73d8d-1043-497a-964e-59540190d632",
+        "name": "config/bbos-firstrun.service",
+        "type": "log",
+        "size": 224,
+        "path": "/tmp/bbos-builds/2e366ace-d198-48af-916b-10a9d3546930/output/configurations/bbos-firstrun.service",
+        "url": "/api/builds/2e366ace-d198-48af-916b-10a9d3546930/artifacts/config/bbos-firstrun.service",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "createdAt": "2025-07-01T23:24:09.867Z"
+      },
+      {
+        "id": "4dadd9c2-f4a4-4c82-9353-63fa4fdccd7f",
+        "name": "config/armbian-config-auto.sh",
+        "type": "log",
+        "size": 429,
+        "path": "/tmp/bbos-builds/2e366ace-d198-48af-916b-10a9d3546930/output/configurations/armbian-config-auto.sh",
+        "url": "/api/builds/2e366ace-d198-48af-916b-10a9d3546930/artifacts/config/armbian-config-auto.sh",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "createdAt": "2025-07-01T23:24:09.867Z"
+      },
+      {
+        "id": "c1689564-4bb6-4b07-bc02-6e0bd42528e6",
+        "name": "config/user-data",
+        "type": "log",
+        "size": 519,
+        "path": "/tmp/bbos-builds/2e366ace-d198-48af-916b-10a9d3546930/output/configurations/user-data",
+        "url": "/api/builds/2e366ace-d198-48af-916b-10a9d3546930/artifacts/config/user-data",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "createdAt": "2025-07-01T23:24:09.867Z"
+      },
+      {
+        "id": "3123a50c-8740-4366-b11b-d3d4dfbd6e8f",
+        "name": "config/meta-data",
+        "type": "log",
+        "size": 63,
+        "path": "/tmp/bbos-builds/2e366ace-d198-48af-916b-10a9d3546930/output/configurations/meta-data",
+        "url": "/api/builds/2e366ace-d198-48af-916b-10a9d3546930/artifacts/config/meta-data",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "createdAt": "2025-07-01T23:24:09.867Z"
+      },
+      {
+        "id": "dbf6dab5-d8d9-432d-b20c-500f17bf213b",
+        "name": "config/config.json",
+        "type": "config",
+        "size": 869,
+        "path": "/tmp/bbos-builds/2e366ace-d198-48af-916b-10a9d3546930/output/configurations/config.json",
+        "url": "/api/builds/2e366ace-d198-48af-916b-10a9d3546930/artifacts/config/config.json",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "createdAt": "2025-07-01T23:24:09.867Z"
+      },
+      {
+        "id": "6c5158ba-e2b2-40da-aa40-6ea7b3908cbf",
+        "name": "BBOS_Armbian_2e366ace-d198-48af-916b-10a9d3546930.img.sha256",
+        "type": "checksum",
+        "size": 116,
+        "path": "/tmp/bbos-builds/2e366ace-d198-48af-916b-10a9d3546930/output/BBOS_Armbian_2e366ace-d198-48af-916b-10a9d3546930.img.sha256",
+        "url": "/api/builds/2e366ace-d198-48af-916b-10a9d3546930/artifacts/BBOS_Armbian_2e366ace-d198-48af-916b-10a9d3546930.img.sha256",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "createdAt": "2025-07-01T23:24:09.867Z"
+      }
+    ],
+    "ae9f3798-6089-4806-b54d-0a8c37221a84": [
+      {
+        "id": "1aee0981-dec7-43a6-9c79-684c7b97414e",
+        "name": "BBOS_Armbian_ae9f3798-6089-4806-b54d-0a8c37221a84.img",
+        "type": "image",
+        "size": 0,
+        "path": "/tmp/bbos-builds/ae9f3798-6089-4806-b54d-0a8c37221a84/output/BBOS_Armbian_ae9f3798-6089-4806-b54d-0a8c37221a84.img",
+        "url": "/api/builds/ae9f3798-6089-4806-b54d-0a8c37221a84/artifacts/BBOS_Armbian_ae9f3798-6089-4806-b54d-0a8c37221a84.img",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "createdAt": "2025-07-01T23:25:50.009Z"
+      },
+      {
+        "id": "91a7b8db-d9d6-4d5a-b36e-c857caa80a10",
+        "name": "armbian-config-auto.sh",
+        "type": "log",
+        "size": 223,
+        "path": "/tmp/bbos-builds/ae9f3798-6089-4806-b54d-0a8c37221a84/armbian-config-auto.sh",
+        "url": "/api/builds/ae9f3798-6089-4806-b54d-0a8c37221a84/artifacts/armbian-config-auto.sh",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "createdAt": "2025-07-01T23:25:50.009Z"
+      },
+      {
+        "id": "8a3e9bf6-6e5b-4d11-92b7-6152ebe1a0a3",
+        "name": "user-data",
+        "type": "log",
+        "size": 271,
+        "path": "/tmp/bbos-builds/ae9f3798-6089-4806-b54d-0a8c37221a84/user-data",
+        "url": "/api/builds/ae9f3798-6089-4806-b54d-0a8c37221a84/artifacts/user-data",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "createdAt": "2025-07-01T23:25:50.009Z"
+      },
+      {
+        "id": "3347c9bd-6618-4494-b5cd-c3bad8cbc7a3",
+        "name": "meta-data",
+        "type": "log",
+        "size": 69,
+        "path": "/tmp/bbos-builds/ae9f3798-6089-4806-b54d-0a8c37221a84/meta-data",
+        "url": "/api/builds/ae9f3798-6089-4806-b54d-0a8c37221a84/artifacts/meta-data",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "createdAt": "2025-07-01T23:25:50.009Z"
+      },
+      {
+        "id": "dba087b5-5772-449b-b14c-772030af2ed5",
+        "name": "config.json",
+        "type": "config",
+        "size": 233,
+        "path": "/tmp/bbos-builds/ae9f3798-6089-4806-b54d-0a8c37221a84/config.json",
+        "url": "/api/builds/ae9f3798-6089-4806-b54d-0a8c37221a84/artifacts/config.json",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "createdAt": "2025-07-01T23:25:50.009Z"
+      },
+      {
+        "id": "913d7c06-a3ea-4f87-bc86-d1c22cdd6562",
+        "name": "config/DEPLOYMENT.md",
+        "type": "log",
+        "size": 2113,
+        "path": "/tmp/bbos-builds/ae9f3798-6089-4806-b54d-0a8c37221a84/output/configurations/DEPLOYMENT.md",
+        "url": "/api/builds/ae9f3798-6089-4806-b54d-0a8c37221a84/artifacts/config/DEPLOYMENT.md",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "createdAt": "2025-07-01T23:25:50.009Z"
+      },
+      {
+        "id": "e2aac545-2603-4282-ac6a-6c2c65244630",
+        "name": "config/bbos-firstrun.service",
+        "type": "log",
+        "size": 224,
+        "path": "/tmp/bbos-builds/ae9f3798-6089-4806-b54d-0a8c37221a84/output/configurations/bbos-firstrun.service",
+        "url": "/api/builds/ae9f3798-6089-4806-b54d-0a8c37221a84/artifacts/config/bbos-firstrun.service",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "createdAt": "2025-07-01T23:25:50.009Z"
+      },
+      {
+        "id": "dff0ac26-f56d-4b42-a606-06318a185a9d",
+        "name": "config/armbian-config-auto.sh",
+        "type": "log",
+        "size": 223,
+        "path": "/tmp/bbos-builds/ae9f3798-6089-4806-b54d-0a8c37221a84/output/configurations/armbian-config-auto.sh",
+        "url": "/api/builds/ae9f3798-6089-4806-b54d-0a8c37221a84/artifacts/config/armbian-config-auto.sh",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "createdAt": "2025-07-01T23:25:50.009Z"
+      },
+      {
+        "id": "565fba01-f4a3-4df8-a542-4f352adb6363",
+        "name": "config/user-data",
+        "type": "log",
+        "size": 271,
+        "path": "/tmp/bbos-builds/ae9f3798-6089-4806-b54d-0a8c37221a84/output/configurations/user-data",
+        "url": "/api/builds/ae9f3798-6089-4806-b54d-0a8c37221a84/artifacts/config/user-data",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "createdAt": "2025-07-01T23:25:50.009Z"
+      },
+      {
+        "id": "e2ca803e-cbb3-4984-952b-0ee7c03b3da9",
+        "name": "config/meta-data",
+        "type": "log",
+        "size": 69,
+        "path": "/tmp/bbos-builds/ae9f3798-6089-4806-b54d-0a8c37221a84/output/configurations/meta-data",
+        "url": "/api/builds/ae9f3798-6089-4806-b54d-0a8c37221a84/artifacts/config/meta-data",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "createdAt": "2025-07-01T23:25:50.009Z"
+      },
+      {
+        "id": "7ba3d6f6-455a-44f2-a932-9f5481a22343",
+        "name": "config/config.json",
+        "type": "config",
+        "size": 233,
+        "path": "/tmp/bbos-builds/ae9f3798-6089-4806-b54d-0a8c37221a84/output/configurations/config.json",
+        "url": "/api/builds/ae9f3798-6089-4806-b54d-0a8c37221a84/artifacts/config/config.json",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "createdAt": "2025-07-01T23:25:50.009Z"
+      },
+      {
+        "id": "b39718d5-f844-45b3-bafb-99257b590a13",
+        "name": "BBOS_Armbian_ae9f3798-6089-4806-b54d-0a8c37221a84.img.sha256",
+        "type": "checksum",
+        "size": 116,
+        "path": "/tmp/bbos-builds/ae9f3798-6089-4806-b54d-0a8c37221a84/output/BBOS_Armbian_ae9f3798-6089-4806-b54d-0a8c37221a84.img.sha256",
+        "url": "/api/builds/ae9f3798-6089-4806-b54d-0a8c37221a84/artifacts/BBOS_Armbian_ae9f3798-6089-4806-b54d-0a8c37221a84.img.sha256",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "createdAt": "2025-07-01T23:25:50.009Z"
+      }
+    ]
+  },
+  "logs": {
+    "b32effe6-cf64-4697-8314-f05527cd61d1": [
+      {
+        "id": "d7e5c0d1-b811-4097-9c89-669b6aa41c99",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "timestamp": "2025-07-01T23:24:05.848Z",
+        "level": "info",
+        "message": "Build job created and queued"
+      },
+      {
+        "id": "21b8b45f-7611-404c-87eb-1349cce94d39",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "timestamp": "2025-07-01T23:24:05.848Z",
+        "level": "info",
+        "message": "Build process started"
+      },
+      {
+        "id": "f8d5402f-6d31-40b9-b27f-b39197a42b0c",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "timestamp": "2025-07-01T23:24:05.849Z",
+        "level": "info",
+        "message": "Build configuration generated at /tmp/bbos-builds/b32effe6-cf64-4697-8314-f05527cd61d1"
+      },
+      {
+        "id": "dd34a09b-9637-4ef0-b770-48121d0e72aa",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "timestamp": "2025-07-01T23:24:05.849Z",
+        "level": "info",
+        "message": "Preparing Armbian configuration..."
+      },
+      {
+        "id": "ce45c53b-d31c-40cc-b805-54bac871675c",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "timestamp": "2025-07-01T23:24:05.849Z",
+        "level": "info",
+        "message": "Downloading official Armbian image..."
+      },
+      {
+        "id": "8efb0c00-b5e0-4741-b9bd-ab6db42094eb",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "timestamp": "2025-07-01T23:24:05.850Z",
+        "level": "info",
+        "message": "Generating armbian-config scripts..."
+      },
+      {
+        "id": "3e086b5f-148c-4ac8-af62-dcecb799d9bc",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "timestamp": "2025-07-01T23:24:05.850Z",
+        "level": "info",
+        "message": "Generating cloud-init configuration..."
+      },
+      {
+        "id": "21faaa7b-a046-4920-a83c-9f4f05c1eed2",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "timestamp": "2025-07-01T23:24:05.851Z",
+        "level": "info",
+        "message": "Creating configured Armbian image..."
+      },
+      {
+        "id": "914fead3-be54-43bc-83f5-e449fd9505cd",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "timestamp": "2025-07-01T23:24:05.851Z",
+        "level": "info",
+        "message": "Copying base image..."
+      },
+      {
+        "id": "9eb0e9e0-70a4-41bb-ba48-464f99670cb0",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "timestamp": "2025-07-01T23:24:05.858Z",
+        "level": "info",
+        "message": "Creating configuration artifacts..."
+      },
+      {
+        "id": "7f3bc143-87de-4b3d-af53-8236f7a744a8",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "timestamp": "2025-07-01T23:24:05.861Z",
+        "level": "info",
+        "message": "Armbian image configured successfully"
+      },
+      {
+        "id": "72dbc374-4d93-4f36-8e39-b17c21e074a4",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "timestamp": "2025-07-01T23:24:05.861Z",
+        "level": "info",
+        "message": "Build completed successfully"
+      },
+      {
+        "id": "4e808d96-d956-4205-b7e0-46cf0b2d18f8",
+        "buildId": "b32effe6-cf64-4697-8314-f05527cd61d1",
+        "timestamp": "2025-07-01T23:24:05.861Z",
+        "level": "info",
+        "message": "Generated 12 artifacts"
+      }
+    ],
+    "2e366ace-d198-48af-916b-10a9d3546930": [
+      {
+        "id": "d5a3c640-911c-4393-ad06-9896c0331fb9",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "timestamp": "2025-07-01T23:24:09.849Z",
+        "level": "info",
+        "message": "Build job created and queued"
+      },
+      {
+        "id": "47da2aa8-8c5d-4469-875c-7bdcf98eaaf9",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "timestamp": "2025-07-01T23:24:09.850Z",
+        "level": "info",
+        "message": "Build process started"
+      },
+      {
+        "id": "5f30cd81-2d3b-49fb-8da9-3580cf8fa20b",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "timestamp": "2025-07-01T23:24:09.852Z",
+        "level": "info",
+        "message": "Build configuration generated at /tmp/bbos-builds/2e366ace-d198-48af-916b-10a9d3546930"
+      },
+      {
+        "id": "549a67bf-4686-43ac-96a5-edb107dad0eb",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "timestamp": "2025-07-01T23:24:09.852Z",
+        "level": "info",
+        "message": "Preparing Armbian configuration..."
+      },
+      {
+        "id": "9f12c089-7595-49de-92fc-16eb1066e68a",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "timestamp": "2025-07-01T23:24:09.852Z",
+        "level": "info",
+        "message": "Downloading official Armbian image..."
+      },
+      {
+        "id": "dc91c198-f4ac-4508-ab41-ee9e8d1a4e58",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "timestamp": "2025-07-01T23:24:09.853Z",
+        "level": "info",
+        "message": "Generating armbian-config scripts..."
+      },
+      {
+        "id": "5f80f0fe-ad79-42fe-8043-6771b895d53a",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "timestamp": "2025-07-01T23:24:09.854Z",
+        "level": "info",
+        "message": "Generating cloud-init configuration..."
+      },
+      {
+        "id": "a0d48b5a-c347-447b-b363-9982330ef1a9",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "timestamp": "2025-07-01T23:24:09.855Z",
+        "level": "info",
+        "message": "Creating configured Armbian image..."
+      },
+      {
+        "id": "7e04b110-ca8d-4ca6-abeb-b94d997bc5f1",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "timestamp": "2025-07-01T23:24:09.855Z",
+        "level": "info",
+        "message": "Copying base image..."
+      },
+      {
+        "id": "efc4244d-9ba8-46c4-8d21-21d22f2abcdb",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "timestamp": "2025-07-01T23:24:09.865Z",
+        "level": "info",
+        "message": "Creating configuration artifacts..."
+      },
+      {
+        "id": "162c0e41-68be-4550-9b8c-12eff3dfdaf4",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "timestamp": "2025-07-01T23:24:09.867Z",
+        "level": "info",
+        "message": "Armbian image configured successfully"
+      },
+      {
+        "id": "e17ee927-e114-49d1-aeb8-2c55c52f88d0",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "timestamp": "2025-07-01T23:24:09.867Z",
+        "level": "info",
+        "message": "Build completed successfully"
+      },
+      {
+        "id": "f3afea6f-c979-4806-8811-02427c3a885e",
+        "buildId": "2e366ace-d198-48af-916b-10a9d3546930",
+        "timestamp": "2025-07-01T23:24:09.867Z",
+        "level": "info",
+        "message": "Generated 12 artifacts"
+      }
+    ],
+    "ae9f3798-6089-4806-b54d-0a8c37221a84": [
+      {
+        "id": "a73a63b7-ccf6-4966-b2b9-5cd2cfce91a1",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "timestamp": "2025-07-01T23:25:49.995Z",
+        "level": "info",
+        "message": "Build job created and queued"
+      },
+      {
+        "id": "6eb03d48-df09-43e5-b6df-02d9e95c3fa5",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "timestamp": "2025-07-01T23:25:49.996Z",
+        "level": "info",
+        "message": "Build process started"
+      },
+      {
+        "id": "5b2f4ba0-e147-4983-8013-417745edfb82",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "timestamp": "2025-07-01T23:25:49.998Z",
+        "level": "info",
+        "message": "Build configuration generated at /tmp/bbos-builds/ae9f3798-6089-4806-b54d-0a8c37221a84"
+      },
+      {
+        "id": "bc39a35e-20ab-4301-8792-b237064cbc5c",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "timestamp": "2025-07-01T23:25:49.998Z",
+        "level": "info",
+        "message": "Preparing Armbian configuration..."
+      },
+      {
+        "id": "4e3439c4-d4a9-49a9-95b1-18f65fe9ad8b",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "timestamp": "2025-07-01T23:25:49.998Z",
+        "level": "info",
+        "message": "Downloading official Armbian image..."
+      },
+      {
+        "id": "e9223ab0-3b22-4821-b785-80967f61e5cf",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "timestamp": "2025-07-01T23:25:49.998Z",
+        "level": "info",
+        "message": "Generating armbian-config scripts..."
+      },
+      {
+        "id": "829467b1-64c5-4541-9af9-8e8e0b7c4798",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "timestamp": "2025-07-01T23:25:49.999Z",
+        "level": "info",
+        "message": "Generating cloud-init configuration..."
+      },
+      {
+        "id": "e55a8ba1-d7a0-458a-a4aa-21cd87b19b73",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "timestamp": "2025-07-01T23:25:49.999Z",
+        "level": "info",
+        "message": "Creating configured Armbian image..."
+      },
+      {
+        "id": "b15d7a00-d9ab-4e18-9567-d480a0781c07",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "timestamp": "2025-07-01T23:25:50.000Z",
+        "level": "info",
+        "message": "Copying base image..."
+      },
+      {
+        "id": "c4e0f30d-5cb3-4f4f-8e7f-f0969acf34fe",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "timestamp": "2025-07-01T23:25:50.006Z",
+        "level": "info",
+        "message": "Creating configuration artifacts..."
+      },
+      {
+        "id": "9c47d99e-b3c1-490b-b5b9-d52b86338821",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "timestamp": "2025-07-01T23:25:50.008Z",
+        "level": "info",
+        "message": "Armbian image configured successfully"
+      },
+      {
+        "id": "39f94b14-987e-47bf-9a4e-a08719e98ddd",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "timestamp": "2025-07-01T23:25:50.009Z",
+        "level": "info",
+        "message": "Build completed successfully"
+      },
+      {
+        "id": "2341b65f-bf75-4fdb-9774-d5e066790848",
+        "buildId": "ae9f3798-6089-4806-b54d-0a8c37221a84",
+        "timestamp": "2025-07-01T23:25:50.009Z",
+        "level": "info",
+        "message": "Generated 12 artifacts"
+      }
+    ]
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "lastUpdated": "2025-07-01T23:27:03.463Z"
+  }
+}

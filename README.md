@@ -61,6 +61,63 @@ bbos/
 
 *Coming soon - project initialization in progress*
 
+## Build System Configuration
+
+BBOS supports two build modes:
+
+### Demo Mode (Default)
+- **Purpose**: Development and testing without internet requirements
+- **Behavior**: Creates small mock text files instead of downloading real Armbian images
+- **File Size**: ~1-2 KB text files  
+- **Requirements**: None (works offline)
+- **Configuration**: `DEMO_MODE=true` (default in development)
+
+### Production Mode
+- **Purpose**: Real Armbian image building with actual downloads
+- **Behavior**: Downloads multi-gigabyte Armbian images from dl.armbian.com
+- **File Size**: 500MB - 2GB+ real bootable images
+- **Requirements**: 
+  - Internet connection
+  - Significant disk space (5GB+ recommended)
+  - System utilities: `kpartx`, `sudo` access for image mounting
+- **Configuration**: `DEMO_MODE=false`
+
+### Switching Modes
+
+1. **Enable Real Image Downloads** (Production Mode):
+   ```bash
+   cd backend
+   echo "DEMO_MODE=false" >> .env
+   npm run dev
+   ```
+
+2. **Return to Demo Mode** (Development):
+   ```bash
+   cd backend
+   echo "DEMO_MODE=true" >> .env
+   npm run dev
+   ```
+
+### Current Status
+
+If you're seeing small "image" files (~1-2KB), you're in **Demo Mode**. The build button IS working correctly - it's just creating mock files for development. To get real Armbian images, switch to Production Mode as shown above.
+
+## Environment Variables
+
+Copy `backend/.env.example` to `backend/.env` and customize:
+
+```bash
+cd backend
+cp .env.example .env
+# Edit .env file to configure your settings
+```
+
+Key variables:
+- `DEMO_MODE`: Controls mock vs real image building
+- `BUILD_DIR`: Where build artifacts are stored
+- `DOWNLOAD_CACHE`: Where downloaded images are cached
+- `PORT`: Backend server port
+
 ## Armbian Documentation References
 
 - [Main Documentation](https://docs.armbian.com/)
