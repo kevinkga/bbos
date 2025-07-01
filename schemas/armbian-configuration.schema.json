@@ -31,7 +31,7 @@
       "properties": {
         "family": {
           "type": "string",
-          "enum": ["rockchip64", "sunxi", "meson64", "rk35xx", "bcm2711", "odroidxu4"],
+          "enum": ["rockchip64", "sunxi", "meson64", "rk35xx", "bcm2711", "odroidxu4", "allwinner", "mediatek", "amlogic"],
           "description": "Board family"
         },
         "name": {
@@ -40,8 +40,12 @@
         },
         "architecture": {
           "type": "string",
-          "enum": ["arm64", "armhf", "x86"],
+          "enum": ["arm64", "armhf", "x86", "riscv64"],
           "description": "Target architecture"
+        },
+        "variant": {
+          "type": "string",
+          "description": "Board variant (if applicable)"
         }
       },
       "required": ["family", "name", "architecture"],
@@ -52,17 +56,17 @@
       "properties": {
         "release": {
           "type": "string",
-          "enum": ["bookworm", "bullseye", "jammy", "noble"],
+          "enum": ["bookworm", "bullseye", "jammy", "noble", "trixie", "sid"],
           "description": "Linux distribution release"
         },
         "type": {
           "type": "string",
-          "enum": ["minimal", "desktop", "server"],
+          "enum": ["minimal", "desktop", "server", "cli"],
           "description": "Image type"
         },
         "desktop": {
           "type": "string",
-          "enum": ["gnome", "kde", "xfce", "cinnamon", "mate"],
+          "enum": ["gnome", "kde", "xfce", "cinnamon", "mate", "budgie", "i3", "sway"],
           "description": "Desktop environment (for desktop type)"
         }
       },
@@ -74,7 +78,7 @@
       "properties": {
         "bootloader": {
           "type": "string",
-          "enum": ["u-boot", "uefi"],
+          "enum": ["u-boot", "uefi", "grub"],
           "default": "u-boot"
         },
         "bootArgs": {
@@ -84,12 +88,69 @@
           },
           "description": "Additional kernel boot arguments"
         },
-        "overlays": {
-          "type": "array",
-          "items": {
-            "type": "string"
+        "kernelParams": {
+          "type": "object",
+          "properties": {
+            "console": {
+              "type": "array",
+              "items": {"type": "string"},
+              "description": "Console devices (e.g., ttyS0,115200)"
+            },
+            "rootwait": {"type": "boolean", "default": true},
+            "earlycon": {"type": "boolean", "default": false},
+            "splash": {"type": "boolean", "default": false},
+            "quiet": {"type": "boolean", "default": false},
+            "loglevel": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 8,
+              "description": "Kernel log level"
+            },
+            "custom": {
+              "type": "object",
+              "additionalProperties": {"type": "string"},
+              "description": "Custom kernel parameters"
+            }
           },
-          "description": "Device tree overlays to enable"
+          "additionalProperties": false
+        },
+        "overlays": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "array",
+              "items": {"type": "string"},
+              "description": "Device tree overlays to enable"
+            },
+            "disabled": {
+              "type": "array", 
+              "items": {"type": "string"},
+              "description": "Device tree overlays to explicitly disable"
+            },
+            "parameters": {
+              "type": "object",
+              "additionalProperties": {"type": "string"},
+              "description": "Overlay parameters"
+            }
+          },
+          "additionalProperties": false
+        },
+        "initramfs": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": true},
+            "modules": {
+              "type": "array",
+              "items": {"type": "string"},
+              "description": "Additional modules to include in initramfs"
+            },
+            "compression": {
+              "type": "string",
+              "enum": ["gzip", "lzma", "xz", "lz4", "zstd"],
+              "default": "lz4"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -99,19 +160,90 @@
       "properties": {
         "filesystem": {
           "type": "string",
-          "enum": ["ext4", "btrfs", "zfs"],
+          "enum": ["ext4", "btrfs", "zfs", "xfs", "f2fs"],
           "default": "ext4"
         },
         "encryption": {
-          "type": "boolean",
-          "default": false,
-          "description": "Enable disk encryption"
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": false},
+            "method": {
+              "type": "string",
+              "enum": ["luks1", "luks2"],
+              "default": "luks2"
+            },
+            "cipher": {
+              "type": "string",
+              "enum": ["aes-xts-plain64", "aes-cbc-essiv", "chacha20-poly1305"],
+              "default": "aes-xts-plain64"
+            },
+            "keySize": {
+              "type": "integer",
+              "enum": [256, 512],
+              "default": 256
+            }
+          },
+          "additionalProperties": false
+        },
+        "zfs": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": false},
+            "poolName": {
+              "type": "string",
+              "default": "rpool",
+              "description": "ZFS pool name"
+            },
+            "compression": {
+              "type": "string",
+              "enum": ["off", "lzjb", "gzip", "zstd", "lz4"],
+              "default": "lz4"
+            },
+            "deduplication": {"type": "boolean", "default": false},
+            "encryption": {
+              "type": "object",
+              "properties": {
+                "enabled": {"type": "boolean", "default": false},
+                "algorithm": {
+                  "type": "string",
+                  "enum": ["aes-256-gcm", "aes-128-gcm", "aes-256-ccm", "aes-128-ccm"],
+                  "default": "aes-256-gcm"
+                }
+              },
+              "additionalProperties": false
+            },
+            "datasets": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {"type": "string"},
+                  "mountpoint": {"type": "string"},
+                  "compression": {"type": "string"},
+                  "quota": {"type": "string"},
+                  "reservation": {"type": "string"}
+                },
+                "required": ["name", "mountpoint"]
+              },
+              "description": "ZFS datasets configuration"
+            }
+          },
+          "additionalProperties": false
         },
         "swapSize": {
           "type": "integer",
           "minimum": 0,
           "maximum": 8192,
           "description": "Swap size in MB (0 to disable)"
+        },
+        "swapFile": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": false},
+            "size": {"type": "string", "description": "Size (e.g., '1G', '512M')"},
+            "location": {"type": "string", "default": "/swapfile"}
+          },
+          "additionalProperties": false
         },
         "partitioning": {
           "type": "object",
@@ -128,7 +260,11 @@
                 "properties": {
                   "mountPoint": {"type": "string"},
                   "size": {"type": "string"},
-                  "filesystem": {"type": "string"}
+                  "filesystem": {"type": "string"},
+                  "flags": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                  }
                 },
                 "required": ["mountPoint", "size"]
               }
@@ -152,7 +288,14 @@
             "enabled": {"type": "boolean", "default": false},
             "ssid": {"type": "string"},
             "psk": {"type": "string"},
-            "country": {"type": "string", "pattern": "^[A-Z]{2}$"}
+            "country": {"type": "string", "pattern": "^[A-Z]{2}$"},
+            "priority": {"type": "integer", "minimum": 0, "maximum": 100},
+            "hidden": {"type": "boolean", "default": false},
+            "security": {
+              "type": "string",
+              "enum": ["none", "wep", "wpa", "wpa2", "wpa3"],
+              "default": "wpa2"
+            }
           },
           "required": ["enabled"]
         },
@@ -161,12 +304,99 @@
           "properties": {
             "dhcp": {"type": "boolean", "default": true},
             "staticIp": {"type": "string", "format": "ipv4"},
+            "netmask": {"type": "string", "format": "ipv4"},
             "gateway": {"type": "string", "format": "ipv4"},
             "dns": {
               "type": "array",
               "items": {"type": "string", "format": "ipv4"}
+            },
+            "mtu": {
+              "type": "integer",
+              "minimum": 68,
+              "maximum": 9000,
+              "default": 1500
             }
           }
+        },
+        "bonding": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": false},
+            "interfaces": {
+              "type": "array",
+              "items": {"type": "string"},
+              "description": "Physical interfaces to bond"
+            },
+            "mode": {
+              "type": "string",
+              "enum": ["balance-rr", "active-backup", "balance-xor", "broadcast", "802.3ad", "balance-tlb", "balance-alb"],
+              "default": "active-backup",
+              "description": "Bonding mode"
+            },
+            "miimon": {
+              "type": "integer",
+              "default": 100,
+              "description": "MII monitoring interval in milliseconds"
+            },
+            "updelay": {"type": "integer", "default": 0},
+            "downdelay": {"type": "integer", "default": 0}
+          },
+          "additionalProperties": false
+        },
+        "bridging": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": false},
+            "name": {"type": "string", "default": "br0"},
+            "interfaces": {
+              "type": "array",
+              "items": {"type": "string"},
+              "description": "Interfaces to bridge"
+            },
+            "stp": {"type": "boolean", "default": false, "description": "Spanning Tree Protocol"},
+            "forwardDelay": {"type": "integer", "default": 15},
+            "maxAge": {"type": "integer", "default": 20}
+          },
+          "additionalProperties": false
+        },
+        "vlan": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "interface": {"type": "string"},
+              "id": {"type": "integer", "minimum": 1, "maximum": 4094},
+              "name": {"type": "string"}
+            },
+            "required": ["interface", "id"]
+          },
+          "description": "VLAN configuration"
+        },
+        "firewall": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": true},
+            "defaultPolicy": {
+              "type": "string",
+              "enum": ["accept", "drop", "reject"],
+              "default": "drop"
+            },
+            "rules": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "action": {"type": "string", "enum": ["accept", "drop", "reject"]},
+                  "protocol": {"type": "string", "enum": ["tcp", "udp", "icmp", "all"]},
+                  "port": {"type": ["integer", "string"]},
+                  "source": {"type": "string"},
+                  "destination": {"type": "string"}
+                },
+                "required": ["action"]
+              }
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -188,9 +418,17 @@
           "sudo": {"type": "boolean", "default": false},
           "shell": {
             "type": "string",
-            "enum": ["/bin/bash", "/bin/zsh", "/bin/sh"],
+            "enum": ["/bin/bash", "/bin/zsh", "/bin/sh", "/bin/fish"],
             "default": "/bin/bash"
-          }
+          },
+          "groups": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Additional groups for the user"
+          },
+          "homeDirectory": {"type": "string"},
+          "uid": {"type": "integer", "minimum": 1000},
+          "gid": {"type": "integer", "minimum": 1000}
         },
         "required": ["username"]
       }
@@ -206,14 +444,72 @@
           "default": 22
         },
         "passwordAuth": {"type": "boolean", "default": false},
-        "rootLogin": {"type": "boolean", "default": false},
+        "rootLogin": {
+          "type": "string",
+          "enum": ["yes", "no", "prohibit-password", "forced-commands-only"],
+          "default": "no"
+        },
         "keyTypes": {
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["rsa", "ecdsa", "ed25519"]
+            "enum": ["rsa", "ecdsa", "ed25519", "dsa"]
           },
           "default": ["ed25519", "ecdsa"]
+        },
+        "maxAuthTries": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 6
+        },
+        "clientAliveInterval": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Seconds before sending null packet to keep connection alive"
+        },
+        "clientAliveCountMax": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 3
+        },
+        "allowUsers": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Users allowed to SSH"
+        },
+        "denyUsers": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Users denied SSH access"
+        },
+        "allowGroups": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "denyGroups": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "banner": {"type": "string", "description": "SSH banner text"},
+        "x11Forwarding": {"type": "boolean", "default": false},
+        "tcpKeepAlive": {"type": "boolean", "default": true},
+        "compression": {"type": "boolean", "default": false},
+        "ciphers": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Allowed SSH ciphers"
+        },
+        "macs": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Allowed MAC algorithms"
+        },
+        "kexAlgorithms": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Key exchange algorithms"
         }
       },
       "additionalProperties": false
@@ -238,11 +534,62 @@
             "properties": {
               "name": {"type": "string"},
               "url": {"type": "string", "format": "uri"},
-              "key": {"type": "string"}
+              "key": {"type": "string"},
+              "components": {
+                "type": "array",
+                "items": {"type": "string"},
+                "default": ["main"]
+              },
+              "distribution": {"type": "string"}
             },
             "required": ["name", "url"]
           },
           "description": "Additional package sources"
+        },
+        "snapPackages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "channel": {"type": "string", "default": "stable"},
+              "classic": {"type": "boolean", "default": false}
+            },
+            "required": ["name"]
+          }
+        },
+        "flatpakPackages": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "services": {
+      "type": "object",
+      "properties": {
+        "enable": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Services to enable at boot"
+        },
+        "disable": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Services to disable"
+        },
+        "custom": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "content": {"type": "string"},
+              "enabled": {"type": "boolean", "default": true}
+            },
+            "required": ["name", "content"]
+          },
+          "description": "Custom systemd service definitions"
         }
       },
       "additionalProperties": false
@@ -261,6 +608,40 @@
         "postBuild": {
           "type": "string",
           "description": "Script to run after image build"
+        },
+        "customize": {
+          "type": "string",
+          "description": "Main customization script"
+        }
+      },
+      "additionalProperties": false
+    },
+    "security": {
+      "type": "object",
+      "properties": {
+        "selinux": {
+          "type": "string",
+          "enum": ["disabled", "permissive", "enforcing"],
+          "default": "disabled"
+        },
+        "apparmor": {"type": "boolean", "default": false},
+        "fail2ban": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": false},
+            "jails": {
+              "type": "array",
+              "items": {"type": "string"},
+              "default": ["sshd"]
+            }
+          }
+        },
+        "ufw": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": false},
+            "defaultPolicy": {"type": "string", "enum": ["allow", "deny"], "default": "deny"}
+          }
         }
       },
       "additionalProperties": false
@@ -282,10 +663,21 @@
             "type": "object",
             "properties": {
               "source": {"type": "string"},
-              "destination": {"type": "string"}
+              "destination": {"type": "string"},
+              "permissions": {"type": "string", "pattern": "^[0-7]{3,4}$"}
             },
             "required": ["source", "destination"]
           }
+        },
+        "moduleBlacklist": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Kernel modules to blacklist"
+        },
+        "moduleLoad": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Kernel modules to force load"
         }
       },
       "additionalProperties": false
