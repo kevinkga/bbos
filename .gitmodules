@@ -1,3 +1,0 @@
-[submodule "chroot/klipper-ubuntu"]
-	path = chroot/klipper-ubuntu
-	url = https://github.com/kevinkga/klipper-ubuntu.git
