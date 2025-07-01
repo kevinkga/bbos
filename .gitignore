@@ -305,4 +305,4 @@ yarn.lock
 
 # Temporary files
 *.tmp
-*.temp 
+*.temp frontend/.vite/
