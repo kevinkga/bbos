@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Layout as FlexLayout, Model, TabNode } from 'flexlayout-react'
-import { ConfigProvider, theme, Button, Dropdown, Typography, Tooltip, notification } from 'antd'
+import { ConfigProvider, Button, Dropdown, Typography, Tooltip, notification } from 'antd'
 import { 
   SettingOutlined, 
   LayoutOutlined, 
@@ -12,6 +12,7 @@ import {
 import { FlexLayoutFactory } from '@/layouts/FlexLayoutFactory'
 import { useAppStore } from '@/stores/app'
 import { ArmbianConfiguration } from '@/types'
+import { antdTheme, colors, components } from '@/styles/design-tokens'
 import { useSocket, BuildStatus } from '@/hooks/useSocket'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ConnectionStatusCompact } from '@/components/ConnectionStatus'
@@ -415,21 +416,47 @@ const App: React.FC<AppProps> = ({ theme: appTheme = 'light' }) => {
     >
       <ConfigProvider
         theme={{
-          algorithm: appTheme === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm,
           token: {
-            colorPrimary: '#1890ff',
-            borderRadius: 4,
+            colorPrimary: colors.accent[500],
+            colorSuccess: colors.success[500],
+            colorWarning: colors.warning[500],
+            colorError: colors.error[500],
+            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            borderRadius: 6,
+            colorBgContainer: colors.background.primary,
+            colorBgLayout: colors.background.secondary,
+            colorBorder: colors.border.light,
+            colorText: colors.text.primary,
+            colorTextSecondary: colors.text.secondary
           }
         }}
       >
-        <div className="h-screen flex flex-col bg-gray-50">
+        <div className="h-screen flex flex-col" style={{ backgroundColor: colors.background.secondary }}>
         {/* Top toolbar */}
-        <div className="flex-shrink-0 h-12 bg-white border-b border-gray-200 flex items-center justify-between px-4">
+        <div 
+          className="flex-shrink-0 h-12 flex items-center justify-between px-4"
+          style={{ 
+            backgroundColor: colors.background.primary,
+            borderBottom: `1px solid ${colors.border.light}`,
+            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+          }}
+        >
           <div className="flex items-center space-x-4">
-            <Title level={4} className="mb-0 text-blue-600">
+            <Title 
+              level={4} 
+              className="mb-0" 
+              style={{ 
+                color: colors.accent[600],
+                fontWeight: 600,
+                letterSpacing: '-0.025em'
+              }}
+            >
               BBOS
             </Title>
-            <span className="text-sm text-gray-500">
+            <span 
+              className="text-sm"
+              style={{ color: colors.text.secondary }}
+            >
               Cloud-based IoT Platform for Armbian Image Configuration
             </span>
           </div>

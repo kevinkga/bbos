@@ -36,6 +36,7 @@ import type { DataNode, TreeProps } from 'antd/es/tree'
 import type { MenuProps } from 'antd'
 import { ArmbianConfiguration } from '@/types'
 import { useAppStore } from '@/stores/app'
+import { colors, components, spacing } from '@/styles/design-tokens'
 
 const { Title, Text } = Typography
 const { TextArea } = Input
@@ -428,17 +429,56 @@ export const FileExplorerPanel: React.FC<FileExplorerPanelProps> = ({
   }
 
   return (
-    <div className="file-explorer-panel h-full flex flex-col">
+    <div 
+      className="bbos-file-explorer h-full flex flex-col"
+      style={{ 
+        backgroundColor: components.panel.background,
+        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+      }}
+    >
       {/* Header */}
-      <div className="p-3 border-b border-gray-200">
+      <div 
+        className="bbos-file-explorer-header"
+        style={{
+          padding: spacing.lg,
+          borderBottom: `1px solid ${colors.border.light}`,
+          backgroundColor: components.sidebar.background
+        }}
+      >
         <div className="flex items-center justify-between mb-2">
-          <Title level={5} className="m-0">Explorer</Title>
-          <Space>
+          <Title 
+            level={5} 
+            className="m-0"
+            style={{ 
+              color: colors.text.primary,
+              fontWeight: 600,
+              fontSize: '1rem'
+            }}
+          >
+            Explorer
+          </Title>
+          <Space size="small">
             <Tooltip title="Refresh">
-              <Button size="small" icon={<ReloadOutlined />} />
+              <Button 
+                size="small" 
+                type="text"
+                icon={<ReloadOutlined />}
+                style={{ 
+                  color: colors.text.secondary,
+                  border: 'none'
+                }}
+              />
             </Tooltip>
             <Tooltip title="Settings">
-              <Button size="small" icon={<SettingOutlined />} />
+              <Button 
+                size="small" 
+                type="text"
+                icon={<SettingOutlined />}
+                style={{ 
+                  color: colors.text.secondary,
+                  border: 'none'
+                }}
+              />
             </Tooltip>
           </Space>
         </div>
@@ -447,23 +487,40 @@ export const FileExplorerPanel: React.FC<FileExplorerPanelProps> = ({
         <Input
           size="small"
           placeholder="Search files..."
-          prefix={<SearchOutlined />}
+          prefix={<SearchOutlined style={{ color: colors.text.muted }} />}
           value={searchValue}
           onChange={(e) => setSearchValue(e.target.value)}
           allowClear
+          style={{
+            borderRadius: '6px',
+            borderColor: colors.border.default
+          }}
         />
       </div>
 
       {/* Action Buttons */}
-      <div className="p-3 border-b border-gray-200">
-        <Space wrap>
+      <div 
+        style={{
+          padding: spacing.lg,
+          borderBottom: `1px solid ${colors.border.light}`,
+          backgroundColor: colors.background.primary
+        }}
+      >
+        <Space wrap size="small">
           <Button 
             size="small" 
+            type="primary"
             icon={<PlusOutlined />}
             onClick={() => {
               setCreateFileType('config')
               setCreateModalVisible(true)
               setSelectedNode(treeData.find(n => n.id === 'configs') || null)
+            }}
+            style={{
+              background: `linear-gradient(135deg, ${colors.accent[500]}, ${colors.accent[600]})`,
+              borderColor: colors.accent[500],
+              borderRadius: '6px',
+              fontWeight: 500
             }}
           >
             New Config
@@ -472,6 +529,11 @@ export const FileExplorerPanel: React.FC<FileExplorerPanelProps> = ({
             size="small" 
             icon={<ImportOutlined />}
             onClick={() => message.info('Import functionality coming soon')}
+            style={{
+              borderColor: colors.border.default,
+              color: colors.text.primary,
+              borderRadius: '6px'
+            }}
           >
             Import
           </Button>
@@ -479,7 +541,13 @@ export const FileExplorerPanel: React.FC<FileExplorerPanelProps> = ({
       </div>
 
       {/* File Tree */}
-      <div className="flex-1 overflow-auto p-2">
+      <div 
+        className="bbos-file-explorer-content flex-1 overflow-auto"
+        style={{ 
+          padding: spacing.sm,
+          backgroundColor: colors.background.primary
+        }}
+      >
         {getFilteredTreeData().length > 0 ? (
                      <Tree
              treeData={getFilteredTreeData()}

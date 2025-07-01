@@ -20,6 +20,7 @@ import { RJSFSchema, UiSchema } from '@rjsf/utils'
 import { IChangeEvent } from '@rjsf/core'
 import { ArmbianConfiguration } from '@/types'
 import { useSocket } from '@/hooks/useSocket'
+import { colors, components, spacing } from '@/styles/design-tokens'
 
 const { Title, Text } = Typography
 
@@ -83,121 +84,548 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
         const schemaData = await response.json()
         setSchema(schemaData)
         
-        // Set initial form data
+        // Set initial form data with schema-aligned defaults
         setFormData(initialConfig as ArmbianConfiguration || {
-          board: '',
-          distribution: 'bookworm',
-          branch: 'current',
+          name: "My Armbian Configuration",
+          description: "",
+          board: {
+            name: "",
+            family: "",
+            architecture: "arm64"
+          },
+          distribution: {
+            release: "bookworm",
+            type: "minimal"
+          },
+          branch: "current",
           bootEnvironment: {
-            consoleInterface: 'serial',
+            bootloader: "u-boot",
+            consoleInterface: "serial",
             enableSsh: true,
             defaultCredentials: {
-              username: 'armbian',
-              password: ''
-            }
+              username: "armbian",
+              password: ""
+            },
+            bootArgs: [],
+            overlays: []
           },
           storage: {
-            filesystem: 'ext4',
-            swapSize: 0
+            filesystem: "ext4",
+            encryption: false,
+            swapSize: 0,
+            partitionLayout: "single",
+            rootSize: "100%"
+          },
+          network: {
+            hostname: "armbian",
+            wifi: {
+              enabled: false,
+              networks: [],
+              country: "US"
+            },
+            ethernet: {
+              dhcp: true
+            }
+          },
+          users: [],
+          ssh: {
+            enabled: true,
+            port: 22,
+            passwordAuth: true,
+            rootLogin: false,
+            keyTypes: ["ed25519", "ecdsa"]
           },
           packages: {
             essential: [],
-            additional: []
+            additional: [],
+            remove: [],
+            sources: []
+          },
+          customization: {
+            scripts: {},
+            files: []
           },
           advanced: {
-            compressionType: 'gz'
+            compressionType: "gz",
+            deviceTreeOverlays: []
           }
         })
         
-        // Configure UI schema for better form rendering
+        // Configure enhanced UI schema for better form rendering
         setUiSchema({
+          'ui:order': ['name', 'description', 'board', 'distribution', 'branch', 'bootEnvironment', 'storage', 'network', 'users', 'ssh', 'packages', 'customization', 'advanced', 'meta'],
+          name: {
+            'ui:title': 'Configuration Name',
+            'ui:description': 'Give your configuration a descriptive name',
+            'ui:placeholder': 'My Armbian Configuration'
+          },
+          description: {
+            'ui:title': 'Description',
+            'ui:description': 'Optional description of this configuration',
+            'ui:widget': 'textarea',
+            'ui:options': {
+              rows: 2
+            }
+          },
           board: {
             'ui:title': 'Target Board',
-            'ui:description': 'Select the target board for your Armbian image',
-            'ui:widget': 'select'
+            'ui:description': 'Configure your target hardware',
+            'ui:order': ['family', 'name', 'architecture'],
+            family: {
+              'ui:title': 'Board Family',
+              'ui:description': 'Select the board family/chipset',
+              'ui:widget': 'select',
+              'ui:placeholder': 'Choose board family...'
+            },
+            name: {
+              'ui:title': 'Board Name',
+              'ui:description': 'Specific board model (e.g., rock-5b, orangepi5)',
+              'ui:placeholder': 'Enter board name...'
+            },
+            architecture: {
+              'ui:title': 'Architecture',
+              'ui:description': 'Target CPU architecture',
+              'ui:widget': 'radio'
+            }
           },
           distribution: {
             'ui:title': 'Distribution',
-            'ui:description': 'Choose the base Linux distribution'
+            'ui:description': 'Choose the base Linux distribution and image type',
+            'ui:order': ['release', 'type', 'desktop'],
+            release: {
+              'ui:title': 'Release',
+              'ui:description': 'Linux distribution release',
+              'ui:widget': 'select'
+            },
+            type: {
+              'ui:title': 'Image Type',
+              'ui:description': 'Select image variant',
+              'ui:widget': 'radio'
+            },
+            desktop: {
+              'ui:title': 'Desktop Environment',
+              'ui:description': 'Choose desktop environment (for desktop images)',
+              'ui:widget': 'select'
+            }
           },
           branch: {
             'ui:title': 'Kernel Branch',
-            'ui:description': 'Select kernel branch (current, edge, legacy)'
+            'ui:description': 'Select kernel branch: current (stable), edge (latest), legacy (LTS)',
+            'ui:widget': 'radio'
           },
           bootEnvironment: {
-            'ui:title': 'Boot Configuration',
-            'ui:description': 'Configure boot and initial system settings',
+            'ui:title': 'Boot & System Configuration',
+            'ui:description': 'Configure boot settings and initial system setup',
+            'ui:order': ['bootloader', 'consoleInterface', 'enableSsh', 'defaultCredentials', 'bootArgs', 'overlays'],
+            bootloader: {
+              'ui:title': 'Bootloader',
+              'ui:widget': 'radio'
+            },
             consoleInterface: {
+              'ui:title': 'Console Interface',
+              'ui:description': 'Where to display console output',
               'ui:widget': 'radio'
             },
             enableSsh: {
-              'ui:title': 'Enable SSH daemon',
-              'ui:description': 'Allow remote SSH connections'
+              'ui:title': 'Enable SSH',
+              'ui:description': 'Allow remote SSH connections on first boot'
             },
             defaultCredentials: {
               'ui:title': 'Default User Account',
+              'ui:description': 'Create default user account',
+              username: {
+                'ui:title': 'Username',
+                'ui:placeholder': 'armbian'
+              },
               password: {
-                'ui:widget': 'password'
+                'ui:title': 'Password',
+                'ui:description': 'Leave empty to require setup on first login',
+                'ui:widget': 'password',
+                'ui:placeholder': 'Optional password...'
               }
-            }
-          },
-          network: {
-            'ui:title': 'Network Configuration',
-            wifi: {
-              'ui:title': 'WiFi Settings',
-              networks: {
-                'ui:title': 'Preconfigured Networks',
-                items: {
-                  password: {
-                    'ui:widget': 'password'
-                  }
-                }
+            },
+            bootArgs: {
+              'ui:title': 'Boot Arguments',
+              'ui:description': 'Additional kernel boot parameters',
+              'ui:options': {
+                addable: true,
+                removable: true
+              }
+            },
+            overlays: {
+              'ui:title': 'Device Tree Overlays',
+              'ui:description': 'Hardware feature overlays to enable',
+              'ui:options': {
+                addable: true,
+                removable: true
               }
             }
           },
           storage: {
             'ui:title': 'Storage Configuration',
-            partitionLayout: {
+            'ui:description': 'Configure filesystem and storage options',
+            'ui:order': ['filesystem', 'partitionLayout', 'rootSize', 'swapSize', 'encryption'],
+            filesystem: {
+              'ui:title': 'Root Filesystem',
+              'ui:description': 'Choose root partition filesystem type',
               'ui:widget': 'radio'
+            },
+            partitionLayout: {
+              'ui:title': 'Partition Layout',
+              'ui:description': 'Choose partition scheme',
+              'ui:widget': 'radio'
+            },
+            rootSize: {
+              'ui:title': 'Root Partition Size',
+              'ui:description': 'Size for root partition (e.g., 8GB, 50%, 100%)',
+              'ui:placeholder': '100%'
+            },
+            swapSize: {
+              'ui:title': 'Swap Size (MB)',
+              'ui:description': 'Swap file size in megabytes (0 to disable)'
+            },
+            encryption: {
+              'ui:title': 'Enable Encryption',
+              'ui:description': 'Encrypt the root filesystem (LUKS)'
+            }
+          },
+          network: {
+            'ui:title': 'Network Configuration',
+            'ui:description': 'Configure networking and connectivity',
+            hostname: {
+              'ui:title': 'Hostname',
+              'ui:description': 'System hostname',
+              'ui:placeholder': 'armbian'
+            },
+            wifi: {
+              'ui:title': 'WiFi Configuration',
+              enabled: {
+                'ui:title': 'Enable WiFi',
+                'ui:description': 'Configure WiFi on first boot'
+              },
+              country: {
+                'ui:title': 'WiFi Country Code',
+                'ui:description': 'Two-letter country code (e.g., US, GB, DE)',
+                'ui:placeholder': 'US'
+              },
+              networks: {
+                'ui:title': 'WiFi Networks',
+                'ui:description': 'Pre-configure WiFi networks',
+                'ui:options': {
+                  addable: true,
+                  removable: true
+                },
+                items: {
+                  ssid: {
+                    'ui:title': 'Network Name (SSID)',
+                    'ui:placeholder': 'MyWiFiNetwork'
+                  },
+                  password: {
+                    'ui:title': 'Password',
+                    'ui:widget': 'password',
+                    'ui:placeholder': 'WiFi password...'
+                  },
+                  priority: {
+                    'ui:title': 'Priority',
+                    'ui:description': 'Connection priority (0-999, higher = preferred)'
+                  }
+                }
+              }
+            },
+            ethernet: {
+              'ui:title': 'Ethernet Configuration',
+              dhcp: {
+                'ui:title': 'Use DHCP',
+                'ui:description': 'Automatically obtain IP address'
+              },
+              staticConfig: {
+                'ui:title': 'Static IP Configuration',
+                'ui:description': 'Manual network configuration (when DHCP is disabled)',
+                ip: {
+                  'ui:title': 'IP Address',
+                  'ui:placeholder': '192.168.1.100'
+                },
+                netmask: {
+                  'ui:title': 'Netmask',
+                  'ui:placeholder': '255.255.255.0'
+                },
+                gateway: {
+                  'ui:title': 'Gateway',
+                  'ui:placeholder': '192.168.1.1'
+                },
+                dns: {
+                  'ui:title': 'DNS Servers',
+                  'ui:description': 'DNS server IP addresses',
+                  'ui:options': {
+                    addable: true,
+                    removable: true
+                  }
+                }
+              }
+            }
+          },
+          users: {
+            'ui:title': 'Additional Users',
+            'ui:description': 'Create additional user accounts',
+            'ui:options': {
+              addable: true,
+              removable: true
+            },
+            items: {
+              username: {
+                'ui:title': 'Username',
+                'ui:placeholder': 'newuser'
+              },
+              password: {
+                'ui:title': 'Password',
+                'ui:widget': 'password'
+              },
+              sudo: {
+                'ui:title': 'Sudo Access',
+                'ui:description': 'Grant administrator privileges'
+              },
+              shell: {
+                'ui:title': 'Default Shell',
+                'ui:widget': 'select'
+              },
+              sshKeys: {
+                'ui:title': 'SSH Public Keys',
+                'ui:options': {
+                  addable: true,
+                  removable: true
+                }
+              },
+              groups: {
+                'ui:title': 'Additional Groups',
+                'ui:options': {
+                  addable: true,
+                  removable: true
+                }
+              }
+            }
+          },
+          ssh: {
+            'ui:title': 'SSH Configuration',
+            'ui:description': 'Configure SSH daemon settings',
+            enabled: {
+              'ui:title': 'Enable SSH',
+              'ui:description': 'Run SSH daemon on boot'
+            },
+            port: {
+              'ui:title': 'SSH Port',
+              'ui:description': 'SSH daemon port number'
+            },
+            passwordAuth: {
+              'ui:title': 'Password Authentication',
+              'ui:description': 'Allow login with passwords'
+            },
+            rootLogin: {
+              'ui:title': 'Root Login',
+              'ui:description': 'Allow direct root login via SSH'
+            },
+            keyTypes: {
+              'ui:title': 'Key Types',
+              'ui:description': 'SSH key types to generate',
+              'ui:widget': 'checkboxes'
             }
           },
           packages: {
-            'ui:title': 'Package Selection',
+            'ui:title': 'Package Management',
+            'ui:description': 'Configure software packages to install or remove',
             essential: {
               'ui:title': 'Essential Packages',
-              'ui:description': 'Core packages required for basic functionality',
+              'ui:description': 'Common utility packages',
               'ui:widget': 'checkboxes'
             },
             additional: {
               'ui:title': 'Additional Packages',
-              'ui:description': 'Optional packages to install',
-              'ui:widget': 'textarea'
+              'ui:description': 'Custom packages to install (one per line)',
+              'ui:widget': 'textarea',
+              'ui:options': {
+                rows: 4
+              }
+            },
+            remove: {
+              'ui:title': 'Packages to Remove',
+              'ui:description': 'Packages to remove from base image',
+              'ui:options': {
+                addable: true,
+                removable: true
+              }
+            },
+            sources: {
+              'ui:title': 'Additional Repositories',
+              'ui:description': 'Add custom package repositories',
+              'ui:options': {
+                addable: true,
+                removable: true
+              },
+              items: {
+                name: {
+                  'ui:title': 'Repository Name',
+                  'ui:placeholder': 'custom-repo'
+                },
+                url: {
+                  'ui:title': 'Repository URL',
+                  'ui:placeholder': 'https://repo.example.com/ubuntu'
+                },
+                key: {
+                  'ui:title': 'GPG Key',
+                  'ui:description': 'Public key for repository verification'
+                },
+                components: {
+                  'ui:title': 'Components',
+                  'ui:placeholder': 'main'
+                }
+              }
             }
           },
           customization: {
             'ui:title': 'System Customization',
+            'ui:description': 'Custom scripts and files',
             scripts: {
               'ui:title': 'Custom Scripts',
+              'ui:description': 'Scripts to run at various stages',
               firstBoot: {
+                'ui:title': 'First Boot Script',
+                'ui:description': 'Bash script to run on first system boot',
                 'ui:widget': 'textarea',
                 'ui:options': {
-                  rows: 10
+                  rows: 8
                 }
               },
               firstLogin: {
+                'ui:title': 'First Login Script',
+                'ui:description': 'Script to run on first user login',
                 'ui:widget': 'textarea',
                 'ui:options': {
-                  rows: 10
+                  rows: 6
+                }
+              },
+              preBuild: {
+                'ui:title': 'Pre-Build Script',
+                'ui:description': 'Script to run during image build (before)',
+                'ui:widget': 'textarea',
+                'ui:options': {
+                  rows: 6
+                }
+              },
+              postBuild: {
+                'ui:title': 'Post-Build Script',
+                'ui:description': 'Script to run during image build (after)',
+                'ui:widget': 'textarea',
+                'ui:options': {
+                  rows: 6
+                }
+              }
+            },
+            files: {
+              'ui:title': 'Custom Files',
+              'ui:description': 'Additional files to include in the image',
+              'ui:options': {
+                addable: true,
+                removable: true
+              },
+              items: {
+                source: {
+                  'ui:title': 'Source Path',
+                  'ui:description': 'Local file path or URL'
+                },
+                destination: {
+                  'ui:title': 'Destination Path',
+                  'ui:description': 'Target path in the image'
+                },
+                permissions: {
+                  'ui:title': 'Permissions',
+                  'ui:description': 'File permissions (e.g., 755, 644)',
+                  'ui:placeholder': '644'
+                },
+                owner: {
+                  'ui:title': 'Owner',
+                  'ui:description': 'File owner (user:group)',
+                  'ui:placeholder': 'root:root'
                 }
               }
             }
           },
           advanced: {
             'ui:title': 'Advanced Options',
-            'ui:collapsible': true,
+            'ui:description': 'Advanced configuration options',
+            compressionType: {
+              'ui:title': 'Image Compression',
+              'ui:description': 'Compression format for final image',
+              'ui:widget': 'radio'
+            },
             deviceTreeOverlays: {
               'ui:title': 'Device Tree Overlays',
-              'ui:description': 'Enable hardware-specific features'
+              'ui:description': 'Additional hardware overlays to enable',
+              'ui:options': {
+                addable: true,
+                removable: true
+              }
+            },
+            kernelConfig: {
+              'ui:title': 'Kernel Configuration',
+              'ui:description': 'Custom kernel config options (CONFIG_ prefix will be added)',
+              'ui:widget': 'textarea',
+              'ui:options': {
+                rows: 6
+              }
+            },
+            ubootConfig: {
+              'ui:title': 'U-Boot Configuration',
+              'ui:description': 'Custom U-Boot configuration options',
+              'ui:widget': 'textarea',
+              'ui:options': {
+                rows: 4
+              }
+            },
+            firmwareFiles: {
+              'ui:title': 'Firmware Files',
+              'ui:description': 'Custom firmware files to include',
+              'ui:options': {
+                addable: true,
+                removable: true
+              },
+              items: {
+                source: {
+                  'ui:title': 'Source Path'
+                },
+                destination: {
+                  'ui:title': 'Destination Path'
+                }
+              }
+            }
+          },
+          meta: {
+            'ui:title': 'Metadata',
+            'ui:description': 'Configuration metadata and version info',
+            id: {
+              'ui:title': 'Configuration ID',
+              'ui:description': 'Unique identifier (auto-generated if empty)',
+              'ui:readonly': true
+            },
+            version: {
+              'ui:title': 'Schema Version',
+              'ui:readonly': true
+            },
+            tags: {
+              'ui:title': 'Tags',
+              'ui:description': 'Tags for organizing configurations',
+              'ui:options': {
+                addable: true,
+                removable: true
+              }
+            },
+            createdAt: {
+              'ui:title': 'Created',
+              'ui:readonly': true,
+              'ui:widget': 'datetime'
+            },
+            updatedAt: {
+              'ui:title': 'Last Modified',
+              'ui:readonly': true,
+              'ui:widget': 'datetime'
             }
           }
         })
@@ -480,12 +908,35 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div 
+      className="h-full flex flex-col"
+      style={{ 
+        backgroundColor: components.panel.background,
+        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+      }}
+    >
       {/* Header */}
-      <div className="flex-shrink-0 p-4 border-b bg-white">
+      <div 
+        className="flex-shrink-0 border-b"
+        style={{
+          padding: spacing.xl,
+          backgroundColor: colors.background.primary,
+          borderBottomColor: colors.border.light,
+          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+        }}
+      >
         <div className="flex items-center justify-between">
           <div>
-            <Title level={4} className="mb-1">
+            <Title 
+              level={4} 
+              className="mb-1"
+              style={{
+                color: colors.text.primary,
+                fontWeight: 600,
+                fontSize: '1.25rem',
+                letterSpacing: '-0.025em'
+              }}
+            >
               Armbian Configuration Editor
             </Title>
             <Space>
@@ -531,11 +982,17 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
               </Space>
             </Space>
           </div>
-          <Space>
+          <Space size="middle">
             <Button 
               icon={<ImportOutlined />} 
               onClick={handleImport}
               disabled={readonly}
+              style={{
+                borderColor: colors.border.default,
+                color: colors.text.primary,
+                borderRadius: '6px',
+                fontWeight: 500
+              }}
             >
               Import
             </Button>
@@ -543,12 +1000,24 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
               icon={<ExportOutlined />} 
               onClick={handleExport}
               disabled={!formData}
+              style={{
+                borderColor: colors.border.default,
+                color: colors.text.primary,
+                borderRadius: '6px',
+                fontWeight: 500
+              }}
             >
               Export
             </Button>
             <Button 
               icon={<ReloadOutlined />} 
               onClick={() => window.location.reload()}
+              style={{
+                borderColor: colors.border.default,
+                color: colors.text.primary,
+                borderRadius: '6px',
+                fontWeight: 500
+              }}
             >
               Reset
             </Button>
@@ -559,6 +1028,13 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
                 onClick={handleSave}
                 loading={saving}
                 disabled={!isValid || readonly || saving}
+                style={{
+                  background: `linear-gradient(135deg, ${colors.accent[500]}, ${colors.accent[600]})`,
+                  borderColor: colors.accent[500],
+                  borderRadius: '6px',
+                  fontWeight: 500,
+                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+                }}
               >
                 {saving ? 'Saving...' : 'Save Configuration'}
               </Button>
@@ -570,6 +1046,13 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
               onClick={handleBuildSubmission}
               loading={isBuilding}
               disabled={!isValid || readonly || isBuilding || !formData?.board?.name || !formData?.distribution?.release}
+              style={{
+                background: `linear-gradient(135deg, ${colors.error[500]}, #dc2626)`,
+                borderColor: colors.error[500],
+                borderRadius: '6px',
+                fontWeight: 500,
+                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'
+              }}
             >
               {isBuilding ? 'Building...' : 'Build Image'}
             </Button>
