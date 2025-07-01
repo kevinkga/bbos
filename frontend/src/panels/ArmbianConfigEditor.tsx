@@ -799,15 +799,11 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
   }, [currentStep])
 
   const jumpToStep = useCallback((targetStep: number) => {
-    // Allow jumping to any previous step or next step if current is valid
-    const currentStepConfig = wizardSteps[currentStep]
-    const isCurrentStepValid = validateCurrentStep(formData, currentStepConfig.schema)
-    const canJump = targetStep <= currentStep || (targetStep === currentStep + 1 && isCurrentStepValid)
-    
-    if (canJump && targetStep >= 0 && targetStep < wizardSteps.length) {
+    // Allow jumping to any step - remove validation restrictions for better UX
+    if (targetStep >= 0 && targetStep < wizardSteps.length) {
       setCurrentStep(targetStep)
     }
-  }, [currentStep, wizardSteps, formData, validateCurrentStep])
+  }, [wizardSteps.length])
 
   const canProceed = useCallback(() => {
     const currentStepConfig = wizardSteps[currentStep]
@@ -841,106 +837,121 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
     
     return (
       <div className="h-full flex flex-col">
-        {/* Progress and Clickable Steps */}
+        {/* Simplified Progress Header */}
         <div style={{ 
           backgroundColor: colors.background.primary,
-          padding: `${spacing.lg} ${spacing.xl}`,
+          padding: `${spacing.md} ${spacing.xl}`,
           borderBottom: `1px solid ${colors.border.light}`
         }}>
-          <Row gutter={[24, 12]} align="middle">
-            <Col span={18}>
+          <Row align="middle">
+            <Col span={12}>
               <div style={{ display: 'flex', alignItems: 'center', gap: spacing.lg }}>
-                {/* Compact Progress Indicator */}
-                <div style={{ 
-                  minWidth: '120px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: spacing.sm 
-                }}>
-                  <Progress 
-                    type="circle"
-                    percent={progress} 
-                    strokeColor={colors.accent[500]}
-                    size={40}
-                    format={() => `${currentStep + 1}/${wizardSteps.length}`}
-                    strokeWidth={8}
-                  />
-                  <div>
-                    <Text style={{ 
-                      color: colors.text.primary, 
-                      fontSize: '14px',
-                      fontWeight: 600,
-                      display: 'block'
-                    }}>
-                      {wizardSteps[currentStep].title}
-                    </Text>
-                    <Text style={{ 
-                      color: colors.text.tertiary, 
-                      fontSize: '12px',
-                      display: 'block'
-                    }}>
-                      {progress}% Complete
-                    </Text>
-                  </div>
-                </div>
-
-                {/* Clickable Steps Breadcrumb */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <Steps 
-                    current={currentStep}
-                    size="small"
-                    type="navigation"
-                    onChange={(current) => jumpToStep(current)}
-                    style={{ cursor: 'pointer' }}
-                    items={wizardSteps.map((step, index) => {
-                      const currentStepConfig = wizardSteps[currentStep]
-                      const isCurrentStepValid = validateCurrentStep(formData, currentStepConfig.schema)
-                      const canNavigate = index <= currentStep || (index === currentStep + 1 && isCurrentStepValid)
-                      return {
-                        key: step.key,
-                        title: (
-                          <span style={{
-                            color: canNavigate ? 'inherit' : colors.text.tertiary,
-                            cursor: canNavigate ? 'pointer' : 'not-allowed',
-                            fontSize: '13px',
-                            fontWeight: index === currentStep ? 600 : 400,
-                            opacity: canNavigate ? 1 : 0.5
-                          }}>
-                            {step.title}
-                          </span>
-                        ),
-                        icon: step.icon,
-                        status: getStepStatus(index)
-                      }
-                    })}
-                  />
+                <Progress 
+                  type="circle"
+                  percent={progress} 
+                  strokeColor={colors.accent[500]}
+                  size={36}
+                  format={() => `${currentStep + 1}/${wizardSteps.length}`}
+                  strokeWidth={8}
+                />
+                <div>
+                  <Text style={{ 
+                    color: colors.text.primary, 
+                    fontSize: '16px',
+                    fontWeight: 600,
+                    display: 'block'
+                  }}>
+                    {wizardSteps[currentStep].title}
+                  </Text>
+                  <Text style={{ 
+                    color: colors.text.secondary, 
+                    fontSize: '13px',
+                    display: 'block'
+                  }}>
+                    {wizardSteps[currentStep].description}
+                  </Text>
                 </div>
               </div>
             </Col>
-            <Col span={6} style={{ textAlign: 'right' }}>
-              <Space direction="vertical" size={4} style={{ width: '100%' }}>
+            <Col span={12} style={{ textAlign: 'right' }}>
+              <Space direction="vertical" size={2} style={{ width: '100%' }}>
                 <Text style={{ 
                   color: colors.text.secondary, 
-                  fontSize: '13px',
+                  fontSize: '12px',
                   fontWeight: 500 
                 }}>
-                  {wizardSteps[currentStep].description}
+                  Configuration Setup Progress
                 </Text>
                 <Text style={{ 
                   color: colors.text.tertiary, 
                   fontSize: '11px' 
                 }}>
-                  Click any completed step to navigate
+                  Use Quick Navigation panel to jump between steps
                 </Text>
               </Space>
             </Col>
           </Row>
         </div>
 
+        {/* Navigation */}
+        <div style={{
+          backgroundColor: colors.background.secondary,
+          padding: spacing.lg,
+          borderBottom: `1px solid ${colors.border.light}`,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <Button
+            icon={<ArrowLeftOutlined />}
+            onClick={prevStep}
+            disabled={currentStep === 0 || readonly}
+            style={{
+              borderColor: colors.border.default,
+              color: colors.text.secondary
+            }}
+          >
+            Previous
+          </Button>
+
+          <Text style={{ color: colors.text.tertiary, fontSize: '12px' }}>
+            Use the wizard to guide you through configuration setup
+          </Text>
+
+          <Space>
+            {currentStep < wizardSteps.length - 1 && (
+              <Button
+                type="primary"
+                icon={<ArrowRightOutlined />}
+                onClick={nextStep}
+                disabled={!canProceed() || readonly}
+                style={{
+                  backgroundColor: colors.accent[500],
+                  borderColor: colors.accent[500]
+                }}
+              >
+                Next Step
+              </Button>
+            )}
+            <Button
+              type="primary"
+              icon={<CheckCircleOutlined />}
+              onClick={handleBuild}
+              disabled={!isValid || readonly}
+              style={{
+                backgroundColor: colors.success[500],
+                borderColor: colors.success[500]
+              }}
+            >
+              Build
+            </Button>
+          </Space>
+        </div>
+
         {/* Step Content */}
         <div className="flex-1 overflow-auto" style={{ padding: spacing.lg }}>
-          <Row gutter={[24, 16]}>
-            <Col span={18}>
+          <Row gutter={[20, 16]}>
+            <Col span={19}>
               <Card
                 style={{
                   backgroundColor: colors.background.primary,
@@ -1000,20 +1011,25 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
               </Card>
             </Col>
             
-            <Col span={6}>
+            <Col span={5}>
               {/* Compact Step Info Sidebar */}
               <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-                {/* Validation Status */}
-                {stepValidation[currentStep] !== undefined && (
-                  <Alert
-                    message={stepValidation[currentStep] ? "Step Complete" : "Required fields missing"}
-                    type={stepValidation[currentStep] ? "success" : "warning"}
-                    showIcon
-                    style={{ marginBottom: spacing.sm }}
-                  />
-                )}
+                {/* Current Step Status */}
+                <Alert
+                  message={
+                    stepValidation[currentStep] === true ? "Step Complete" :
+                    stepValidation[currentStep] === false ? "Required fields missing" :
+                    "Fill out the form to proceed"
+                  }
+                  type={
+                    stepValidation[currentStep] === true ? "success" :
+                    stepValidation[currentStep] === false ? "warning" : "info"
+                  }
+                  showIcon
+                  style={{ marginBottom: spacing.sm }}
+                />
 
-                {/* Quick Navigation */}
+                {/* Enhanced Quick Navigation */}
                 <Card
                   size="small"
                   style={{
@@ -1024,49 +1040,92 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
                   bodyStyle={{ padding: spacing.md }}
                 >
                   <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs }}>
+                      <span style={{ fontSize: '16px' }}>🧭</span>
+                      <Text style={{ 
+                        color: colors.text.primary,
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        display: 'block'
+                      }}>
+                        Navigation
+                      </Text>
+                    </div>
                     <Text style={{ 
-                      color: colors.text.primary,
-                      fontSize: '13px',
-                      fontWeight: 600,
+                      color: colors.text.tertiary,
+                      fontSize: '11px',
+                      marginBottom: spacing.sm,
                       display: 'block'
                     }}>
-                      Quick Navigation
+                      Click any step to navigate instantly
                     </Text>
                     
                     {wizardSteps.map((step, index) => {
-                      const isCompleted = index < currentStep
+                      const isCompleted = stepValidation[index] === true
                       const isCurrent = index === currentStep
-                      const canNavigate = index <= currentStep
+                      const hasValidationError = stepValidation[index] === false
                       
                       return (
                         <div 
                           key={step.key}
-                          onClick={() => canNavigate && jumpToStep(index)}
+                          onClick={() => jumpToStep(index)}
                           style={{
-                            padding: `${spacing.xs} ${spacing.sm}`,
-                            borderRadius: '4px',
+                            padding: `${spacing.sm} ${spacing.sm}`,
+                            borderRadius: '6px',
                             backgroundColor: isCurrent ? colors.accent[50] : 'transparent',
-                            cursor: canNavigate ? 'pointer' : 'default',
+                            cursor: 'pointer',
                             transition: 'all 0.2s ease',
                             border: isCurrent ? `1px solid ${colors.accent[500]}` : '1px solid transparent'
                           }}
+                          onMouseEnter={(e) => {
+                            if (!isCurrent) {
+                              e.currentTarget.style.backgroundColor = colors.background.secondary
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isCurrent) {
+                              e.currentTarget.style.backgroundColor = 'transparent'
+                            }
+                          }}
                         >
-                          <Space size="small">
-                            <span style={{
-                              color: isCompleted ? colors.success[500] : 
-                                     isCurrent ? colors.accent[600] : colors.text.tertiary,
-                              fontSize: '12px'
+                          <Space size="small" style={{ width: '100%' }}>
+                            <div style={{
+                              minWidth: '18px',
+                              height: '18px',
+                              borderRadius: '50%',
+                              backgroundColor: isCompleted ? colors.success[500] : 
+                                             hasValidationError ? colors.error[500] :
+                                             isCurrent ? colors.accent[500] : colors.border.default,
+                              color: (isCompleted || hasValidationError || isCurrent) ? colors.text.inverse : colors.text.tertiary,
+                              fontSize: '10px',
+                              fontWeight: 600,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
                             }}>
-                              {isCompleted ? '✓' : index + 1}
-                            </span>
-                            <Text style={{
-                              fontSize: '12px',
-                              color: isCurrent ? colors.accent[700] : 
-                                     isCompleted ? colors.text.primary : colors.text.tertiary,
-                              fontWeight: isCurrent ? 500 : 400
-                            }}>
-                              {step.title}
-                            </Text>
+                              {isCompleted ? '✓' : hasValidationError ? '!' : index + 1}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <Text style={{
+                                fontSize: '12px',
+                                color: isCurrent ? colors.accent[700] : colors.text.primary,
+                                fontWeight: isCurrent ? 600 : 500,
+                                display: 'block',
+                                lineHeight: '1.2'
+                              }}>
+                                {step.title}
+                              </Text>
+                              {isCurrent && (
+                                <Text style={{
+                                  fontSize: '10px',
+                                  color: colors.text.tertiary,
+                                  display: 'block',
+                                  marginTop: '2px'
+                                }}>
+                                  Current step
+                                </Text>
+                              )}
+                            </div>
                           </Space>
                         </div>
                       )
@@ -1145,60 +1204,6 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
               </Space>
             </Col>
           </Row>
-        </div>
-
-        {/* Navigation */}
-        <div style={{
-          backgroundColor: colors.background.secondary,
-          padding: spacing.xl,
-          borderTop: `1px solid ${colors.border.light}`,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <Button
-            icon={<ArrowLeftOutlined />}
-            onClick={prevStep}
-            disabled={currentStep === 0 || readonly}
-            style={{
-              borderColor: colors.border.default,
-              color: colors.text.secondary
-            }}
-          >
-            Previous
-          </Button>
-
-          <Text style={{ color: colors.text.tertiary, fontSize: '12px' }}>
-            Use the wizard to guide you through configuration setup
-          </Text>
-
-          {currentStep < wizardSteps.length - 1 ? (
-            <Button
-              type="primary"
-              icon={<ArrowRightOutlined />}
-              onClick={nextStep}
-              disabled={!canProceed() || readonly}
-              style={{
-                backgroundColor: colors.accent[500],
-                borderColor: colors.accent[500]
-              }}
-            >
-              Next Step
-            </Button>
-          ) : (
-            <Button
-              type="primary"
-              icon={<CheckCircleOutlined />}
-              onClick={handleBuild}
-              disabled={!isValid || readonly}
-              style={{
-                backgroundColor: colors.success[500],
-                borderColor: colors.success[500]
-              }}
-            >
-              Build
-            </Button>
-          )}
         </div>
       </div>
     )
