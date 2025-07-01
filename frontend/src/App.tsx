@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Layout as FlexLayout, Model, TabNode } from 'flexlayout-react'
 import { ConfigProvider, App as AntdApp, Button, Dropdown, Typography, Tooltip, notification } from 'antd'
+import { StyleProvider } from '@ant-design/cssinjs'
 import { 
   SettingOutlined, 
   LayoutOutlined, 
@@ -33,6 +34,7 @@ const App: React.FC<AppProps> = ({ theme = 'light' }) => {
   const [model, setModel] = useState<Model | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [buildStatuses, setBuildStatuses] = useState<BuildStatus[]>([])
+  const [selectedConfig, setSelectedConfig] = useState<ArmbianConfiguration | null>(null)
   
   // Zustand store
   const { 
@@ -42,8 +44,8 @@ const App: React.FC<AppProps> = ({ theme = 'light' }) => {
     configurations
   } = useAppStore()
 
-  // Get current configuration (first one for now)
-  const currentConfig = configurations.length > 0 ? configurations[0] : null
+  // Get current configuration - use selected config or fall back to first one
+  const currentConfig = selectedConfig || (configurations.length > 0 ? configurations[0] : null)
 
   // Socket.io integration for real-time communication
   const { emit } = useSocket({
@@ -213,6 +215,7 @@ const App: React.FC<AppProps> = ({ theme = 'light' }) => {
               if (file.type === 'config' && file.content) {
                 // Load configuration into the editor
                 const config = file.content as ArmbianConfiguration
+                setSelectedConfig(config)
                 
                 notification.info({
                   message: 'Configuration Loaded',
@@ -221,7 +224,6 @@ const App: React.FC<AppProps> = ({ theme = 'light' }) => {
                   duration: 3
                 })
                 
-                // You would typically set this in a shared state or pass it to the editor
                 console.log('Loading configuration into editor:', config)
               } else if (file.type === 'template') {
                 // Load template configuration
@@ -269,6 +271,8 @@ const App: React.FC<AppProps> = ({ theme = 'light' }) => {
                 
                 const templateConfig = templateConfigs[file.id as keyof typeof templateConfigs]
                 if (templateConfig) {
+                  setSelectedConfig(templateConfig as ArmbianConfiguration)
+                  
                   notification.info({
                     message: 'Template Loaded',
                     description: `Template "${file.title}" loaded. You can modify and save it as a new configuration.`,
@@ -429,24 +433,25 @@ const App: React.FC<AppProps> = ({ theme = 'light' }) => {
         // Could send to error reporting service here
       }}
     >
-      <ConfigProvider
-        theme={{
-          token: {
-            colorPrimary: colors.accent[500],
-            colorSuccess: colors.success[500],
-            colorWarning: colors.warning[500],
-            colorError: colors.error[500],
-            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            borderRadius: 6,
-            colorBgContainer: colors.background.primary,
-            colorBgLayout: colors.background.secondary,
-            colorBorder: colors.border.light,
-            colorText: colors.text.primary,
-            colorTextSecondary: colors.text.secondary
-          }
-        }}
-      >
-        <AntdApp>
+      <StyleProvider>
+        <ConfigProvider
+          theme={{
+            token: {
+              colorPrimary: colors.accent[500],
+              colorSuccess: colors.success[500],
+              colorWarning: colors.warning[500],
+              colorError: colors.error[500],
+              fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              borderRadius: 6,
+              colorBgContainer: colors.background.primary,
+              colorBgLayout: colors.background.secondary,
+              colorBorder: colors.border.light,
+              colorText: colors.text.primary,
+              colorTextSecondary: colors.text.secondary
+            }
+          }}
+        >
+          <AntdApp>
           <div className="h-screen flex flex-col" style={{ backgroundColor: colors.background.secondary }}>
         {/* Top toolbar */}
         <div 
@@ -531,8 +536,9 @@ const App: React.FC<AppProps> = ({ theme = 'light' }) => {
           />
         </div>
         </div>
-        </AntdApp>
-      </ConfigProvider>
+          </AntdApp>
+        </ConfigProvider>
+      </StyleProvider>
     </ErrorBoundary>
   )
 }

@@ -425,6 +425,126 @@ body {
   overflow: auto;
 }
 
+/* ArmbianConfigEditor specific styling with high specificity */
+.bbos-config-editor-wrapper,
+.bbos-config-editor-wrapper * {
+  background-color: inherit !important;
+  color: inherit !important;
+}
+
+.bbos-config-editor-wrapper .ant-card {
+  background-color: var(--color-bg-primary) !important;
+  border-color: var(--color-border-light) !important;
+  color: var(--color-text-primary) !important;
+}
+
+.bbos-config-editor-wrapper .ant-typography {
+  color: inherit !important;
+}
+
+.bbos-config-editor-wrapper .ant-btn-primary {
+  background-color: var(--color-accent-500) !important;
+  border-color: var(--color-accent-500) !important;
+  color: white !important;
+}
+
+/* RJSF Form Styling */
+.bbos-rjsf-form {
+  font-family: var(--font-family-sans) !important;
+}
+
+.bbos-rjsf-form .ant-form-item {
+  margin-bottom: var(--spacing-xl) !important;
+}
+
+.bbos-rjsf-form .ant-form-item-label > label {
+  font-weight: 600 !important;
+  color: var(--color-text-primary) !important;
+  font-size: var(--font-size-sm) !important;
+}
+
+.bbos-rjsf-form .ant-form-item-extra {
+  color: var(--color-text-tertiary) !important;
+  font-size: var(--font-size-xs) !important;
+}
+
+.bbos-rjsf-form .ant-input,
+.bbos-rjsf-form .ant-select-selector,
+.bbos-rjsf-form .ant-input-number,
+.bbos-rjsf-form .ant-checkbox-wrapper,
+.bbos-rjsf-form .ant-radio-wrapper {
+  border-radius: var(--radius-base) !important;
+  transition: all 0.2s ease !important;
+}
+
+.bbos-rjsf-form .ant-input:focus,
+.bbos-rjsf-form .ant-select-selector:focus,
+.bbos-rjsf-form .ant-input-number:focus {
+  border-color: var(--color-accent-500) !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1) !important;
+}
+
+.bbos-rjsf-form .ant-form-item-has-error .ant-input,
+.bbos-rjsf-form .ant-form-item-has-error .ant-select-selector {
+  border-color: var(--color-error) !important;
+}
+
+.bbos-rjsf-form .ant-form-item-explain-error {
+  color: var(--color-error) !important;
+  font-size: var(--font-size-xs) !important;
+}
+
+.bbos-rjsf-form .ant-btn {
+  border-radius: var(--radius-base) !important;
+  font-weight: 500 !important;
+}
+
+.bbos-rjsf-form .ant-btn-dashed {
+  border-color: var(--color-border-default) !important;
+  color: var(--color-text-secondary) !important;
+}
+
+.bbos-rjsf-form .ant-btn-dashed:hover {
+  border-color: var(--color-accent-500) !important;
+  color: var(--color-accent-600) !important;
+}
+
+/* RJSF Array field styling */
+.bbos-rjsf-form .array-item {
+  background: var(--color-bg-tertiary) !important;
+  border: 1px solid var(--color-border-light) !important;
+  border-radius: var(--radius-md) !important;
+  padding: var(--spacing-lg) !important;
+  margin-bottom: var(--spacing-md) !important;
+}
+
+.bbos-rjsf-form .array-item-remove {
+  color: var(--color-error) !important;
+}
+
+/* RJSF Object field styling */
+.bbos-rjsf-form .object-property {
+  background: var(--color-bg-secondary) !important;
+  border: 1px solid var(--color-border-light) !important;
+  border-radius: var(--radius-md) !important;
+  padding: var(--spacing-lg) !important;
+  margin-bottom: var(--spacing-lg) !important;
+}
+
+/* Error list styling */
+.bbos-rjsf-form .error-list {
+  background: var(--color-bg-secondary) !important;
+  border: 1px solid var(--color-error) !important;
+  border-radius: var(--radius-md) !important;
+  padding: var(--spacing-lg) !important;
+  margin-bottom: var(--spacing-xl) !important;
+}
+
+.bbos-rjsf-form .error-list li {
+  color: var(--color-error) !important;
+  font-size: var(--font-size-sm) !important;
+}
+
 /* Build Status */
 .bbos-build-status {
   padding: var(--spacing-xl);
