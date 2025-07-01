@@ -1,0 +1,98 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://bbos.dev/schemas/user.schema.json",
+  "title": "User",
+  "description": "Authenticated user entity with social login integration",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique user identifier"
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "User's email address"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "User's display name"
+    },
+    "avatar": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL to user's avatar image"
+    },
+    "provider": {
+      "type": "string",
+      "enum": ["google", "github", "discord", "microsoft"],
+      "description": "Social login provider"
+    },
+    "providerId": {
+      "type": "string",
+      "description": "Provider-specific user ID"
+    },
+    "preferences": {
+      "type": "object",
+      "properties": {
+        "theme": {
+          "type": "string",
+          "enum": ["light", "dark", "auto"],
+          "default": "auto"
+        },
+        "layout": {
+          "type": "object",
+          "description": "FlexLayout configuration stored as JSON"
+        },
+        "defaultBoard": {
+          "type": "string",
+          "description": "Default Armbian board selection"
+        }
+      },
+      "additionalProperties": true
+    },
+    "subscription": {
+      "type": "object",
+      "properties": {
+        "tier": {
+          "type": "string",
+          "enum": ["free", "pro", "enterprise"],
+          "default": "free"
+        },
+        "buildsPerMonth": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of builds allowed per month"
+        },
+        "maxConcurrentBuilds": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "Maximum concurrent builds allowed"
+        }
+      },
+      "required": ["tier"],
+      "additionalProperties": false
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Account creation timestamp"
+    },
+    "lastLoginAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last login timestamp"
+    },
+    "isActive": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether the user account is active"
+    }
+  },
+  "required": ["id", "email", "name", "provider", "providerId", "createdAt"],
+  "additionalProperties": false
+} 

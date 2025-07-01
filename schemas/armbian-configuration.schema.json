@@ -1,0 +1,310 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://bbos.dev/schemas/armbian-configuration.schema.json",
+  "title": "ArmbianConfiguration",
+  "description": "Complete Armbian image configuration based on official documentation",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique configuration identifier"
+    },
+    "userId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Owner user ID"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "Human-readable configuration name"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Optional configuration description"
+    },
+    "board": {
+      "type": "object",
+      "properties": {
+        "family": {
+          "type": "string",
+          "enum": ["rockchip64", "sunxi", "meson64", "rk35xx", "bcm2711", "odroidxu4"],
+          "description": "Board family"
+        },
+        "name": {
+          "type": "string",
+          "description": "Specific board name (e.g., 'rock-5b', 'orangepi5')"
+        },
+        "architecture": {
+          "type": "string",
+          "enum": ["arm64", "armhf", "x86"],
+          "description": "Target architecture"
+        }
+      },
+      "required": ["family", "name", "architecture"],
+      "additionalProperties": false
+    },
+    "distribution": {
+      "type": "object",
+      "properties": {
+        "release": {
+          "type": "string",
+          "enum": ["bookworm", "bullseye", "jammy", "noble"],
+          "description": "Linux distribution release"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["minimal", "desktop", "server"],
+          "description": "Image type"
+        },
+        "desktop": {
+          "type": "string",
+          "enum": ["gnome", "kde", "xfce", "cinnamon", "mate"],
+          "description": "Desktop environment (for desktop type)"
+        }
+      },
+      "required": ["release", "type"],
+      "additionalProperties": false
+    },
+    "bootEnvironment": {
+      "type": "object",
+      "properties": {
+        "bootloader": {
+          "type": "string",
+          "enum": ["u-boot", "uefi"],
+          "default": "u-boot"
+        },
+        "bootArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Additional kernel boot arguments"
+        },
+        "overlays": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Device tree overlays to enable"
+        }
+      },
+      "additionalProperties": false
+    },
+    "storage": {
+      "type": "object",
+      "properties": {
+        "filesystem": {
+          "type": "string",
+          "enum": ["ext4", "btrfs", "zfs"],
+          "default": "ext4"
+        },
+        "encryption": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable disk encryption"
+        },
+        "swapSize": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8192,
+          "description": "Swap size in MB (0 to disable)"
+        },
+        "partitioning": {
+          "type": "object",
+          "properties": {
+            "scheme": {
+              "type": "string",
+              "enum": ["gpt", "mbr"],
+              "default": "gpt"
+            },
+            "customPartitions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "mountPoint": {"type": "string"},
+                  "size": {"type": "string"},
+                  "filesystem": {"type": "string"}
+                },
+                "required": ["mountPoint", "size"]
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "network": {
+      "type": "object",
+      "properties": {
+        "hostname": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]$",
+          "description": "System hostname"
+        },
+        "wifi": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": false},
+            "ssid": {"type": "string"},
+            "psk": {"type": "string"},
+            "country": {"type": "string", "pattern": "^[A-Z]{2}$"}
+          },
+          "required": ["enabled"]
+        },
+        "ethernet": {
+          "type": "object",
+          "properties": {
+            "dhcp": {"type": "boolean", "default": true},
+            "staticIp": {"type": "string", "format": "ipv4"},
+            "gateway": {"type": "string", "format": "ipv4"},
+            "dns": {
+              "type": "array",
+              "items": {"type": "string", "format": "ipv4"}
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "users": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^[a-z_][a-z0-9_-]*[$]?$"
+          },
+          "password": {"type": "string"},
+          "sshKeys": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "sudo": {"type": "boolean", "default": false},
+          "shell": {
+            "type": "string",
+            "enum": ["/bin/bash", "/bin/zsh", "/bin/sh"],
+            "default": "/bin/bash"
+          }
+        },
+        "required": ["username"]
+      }
+    },
+    "ssh": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean", "default": true},
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 22
+        },
+        "passwordAuth": {"type": "boolean", "default": false},
+        "rootLogin": {"type": "boolean", "default": false},
+        "keyTypes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["rsa", "ecdsa", "ed25519"]
+          },
+          "default": ["ed25519", "ecdsa"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "packages": {
+      "type": "object",
+      "properties": {
+        "install": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Packages to install"
+        },
+        "remove": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Packages to remove"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "url": {"type": "string", "format": "uri"},
+              "key": {"type": "string"}
+            },
+            "required": ["name", "url"]
+          },
+          "description": "Additional package sources"
+        }
+      },
+      "additionalProperties": false
+    },
+    "scripts": {
+      "type": "object",
+      "properties": {
+        "firstBoot": {
+          "type": "string",
+          "description": "Script to run on first boot"
+        },
+        "preBuild": {
+          "type": "string",
+          "description": "Script to run before image build"
+        },
+        "postBuild": {
+          "type": "string",
+          "description": "Script to run after image build"
+        }
+      },
+      "additionalProperties": false
+    },
+    "advanced": {
+      "type": "object",
+      "properties": {
+        "kernelConfig": {
+          "type": "object",
+          "description": "Custom kernel configuration options"
+        },
+        "ubootConfig": {
+          "type": "object",
+          "description": "Custom U-Boot configuration"
+        },
+        "firmwareFiles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "source": {"type": "string"},
+              "destination": {"type": "string"}
+            },
+            "required": ["source", "destination"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1,
+      "description": "Configuration version for schema evolution"
+    }
+  },
+  "required": ["id", "userId", "name", "board", "distribution", "createdAt", "version"],
+  "additionalProperties": false
+} 

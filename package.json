@@ -1,0 +1,51 @@
+{
+  "name": "bbos",
+  "version": "1.0.0",
+  "description": "Cloud-based IoT Platform for Armbian Image Configuration",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:backend": "npm run dev --workspace=backend",
+    "build": "npm run build --workspaces",
+    "build:frontend": "npm run build --workspace=frontend",
+    "build:backend": "npm run build --workspace=backend",
+    "lint": "npm run lint --workspaces",
+    "test": "npm run test --workspaces",
+    "clean": "npm run clean --workspaces && rm -rf node_modules",
+    "install:all": "npm install --workspaces",
+    "docker:build": "docker-compose -f deployment/docker-compose.yml build",
+    "docker:up": "docker-compose -f deployment/docker-compose.yml up -d",
+    "docker:down": "docker-compose -f deployment/docker-compose.yml down"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.5",
+    "typescript": "^5.4.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kaubeelack/bbos.git"
+  },
+  "keywords": [
+    "armbian",
+    "iot",
+    "image-builder",
+    "cloud",
+    "react",
+    "nodejs",
+    "websocket"
+  ],
+  "author": "kaubeelack",
+  "license": "MIT"
+} 

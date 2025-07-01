@@ -1,0 +1,276 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://bbos.dev/schemas/build-job.schema.json",
+  "title": "BuildJob",
+  "description": "Armbian image build job with real-time status tracking",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique build job identifier"
+    },
+    "userId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Owner user ID"
+    },
+    "configurationId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Associated configuration ID"
+    },
+    "configurationSnapshot": {
+      "$ref": "https://bbos.dev/schemas/armbian-configuration.schema.json",
+      "description": "Snapshot of configuration at build time"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "initializing",
+        "downloading",
+        "building",
+        "packaging",
+        "uploading",
+        "completed",
+        "failed",
+        "cancelled"
+      ],
+      "description": "Current build status"
+    },
+    "progress": {
+      "type": "object",
+      "properties": {
+        "percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Build progress percentage"
+        },
+        "currentStage": {
+          "type": "string",
+          "description": "Current build stage description"
+        },
+        "estimatedTimeRemaining": {
+          "type": "integer",
+          "description": "Estimated time remaining in seconds"
+        }
+      },
+      "additionalProperties": false
+    },
+    "buildServer": {
+      "type": "object",
+      "properties": {
+        "serverId": {
+          "type": "string",
+          "description": "Build server identifier"
+        },
+        "region": {
+          "type": "string",
+          "description": "Build server region"
+        },
+        "specs": {
+          "type": "object",
+          "properties": {
+            "cpu": {"type": "string"},
+            "memory": {"type": "string"},
+            "storage": {"type": "string"}
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "timing": {
+      "type": "object",
+      "properties": {
+        "queuedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When job was queued"
+        },
+        "startedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When build started"
+        },
+        "completedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When build completed"
+        },
+        "duration": {
+          "type": "integer",
+          "description": "Total build duration in seconds"
+        }
+      },
+      "required": ["queuedAt"],
+      "additionalProperties": false
+    },
+    "logs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "level": {
+            "type": "string",
+            "enum": ["debug", "info", "warning", "error"]
+          },
+          "message": {
+            "type": "string"
+          },
+          "component": {
+            "type": "string",
+            "description": "Component that generated the log"
+          }
+        },
+        "required": ["timestamp", "level", "message"],
+        "additionalProperties": false
+      },
+      "description": "Build logs with real-time updates"
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Artifact filename"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["image", "checksum", "log", "config"],
+            "description": "Artifact type"
+          },
+          "size": {
+            "type": "integer",
+            "description": "File size in bytes"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Download URL"
+          },
+          "checksum": {
+            "type": "object",
+            "properties": {
+              "algorithm": {
+                "type": "string",
+                "enum": ["md5", "sha256", "sha512"]
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": ["algorithm", "value"]
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When artifact expires"
+          }
+        },
+        "required": ["name", "type", "size", "url"],
+        "additionalProperties": false
+      },
+      "description": "Generated build artifacts"
+    },
+    "error": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Error code"
+        },
+        "message": {
+          "type": "string",
+          "description": "Error message"
+        },
+        "details": {
+          "type": "object",
+          "description": "Additional error details"
+        },
+        "stage": {
+          "type": "string",
+          "description": "Build stage where error occurred"
+        }
+      },
+      "required": ["code", "message"],
+      "additionalProperties": false
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "armbianVersion": {
+          "type": "string",
+          "description": "Armbian framework version used"
+        },
+        "kernelVersion": {
+          "type": "string",
+          "description": "Kernel version"
+        },
+        "buildEnvironment": {
+          "type": "object",
+          "description": "Build environment details"
+        },
+        "buildOptions": {
+          "type": "object",
+          "description": "Build options and flags used"
+        }
+      },
+      "additionalProperties": true
+    },
+    "priority": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "default": 5,
+      "description": "Build priority (1=lowest, 10=highest)"
+    },
+    "retryCount": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Number of retry attempts"
+    },
+    "maxRetries": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 3,
+      "description": "Maximum retry attempts"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "User-defined tags for organization"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Job creation timestamp"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last update timestamp"
+    }
+  },
+  "required": [
+    "id",
+    "userId",
+    "configurationId",
+    "configurationSnapshot",
+    "status",
+    "timing",
+    "createdAt",
+    "updatedAt"
+  ],
+  "additionalProperties": false
+} 

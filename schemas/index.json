@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://bbos.dev/schemas/index.json",
+  "title": "BBOS Schema Index",
+  "description": "Index of all available BBOS schemas",
+  "type": "object",
+  "properties": {
+    "schemas": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "$ref": "https://bbos.dev/schemas/user.schema.json",
+          "description": "User entity with social login integration"
+        },
+        "armbianConfiguration": {
+          "$ref": "https://bbos.dev/schemas/armbian-configuration.schema.json",
+          "description": "Complete Armbian image configuration"
+        },
+        "buildJob": {
+          "$ref": "https://bbos.dev/schemas/build-job.schema.json",
+          "description": "Build job with real-time status tracking"
+        }
+      },
+      "additionalProperties": false
+    },
+    "version": {
+      "type": "string",
+      "const": "1.0.0",
+      "description": "Schema collection version"
+    },
+    "lastUpdated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last update timestamp"
+    }
+  },
+  "required": ["schemas", "version"],
+  "additionalProperties": false
+} 
