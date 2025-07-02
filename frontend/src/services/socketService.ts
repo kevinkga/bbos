@@ -1,4 +1,17 @@
 import { io, Socket } from 'socket.io-client';
+import {
+  BuildProgress,
+  Device,
+  FlashProgressEvent,
+  FlashCompletedEvent,
+  FlashFailedEvent,
+  SPIProgressEvent,
+  SPICompletedEvent,
+  SPIErrorEvent,
+  DeviceProgressEvent,
+  DeviceCompletedEvent,
+  DeviceErrorEvent
+} from '../types/index.js';
 
 export interface BuildStatus {
   id: string;
@@ -95,6 +108,66 @@ class SocketService {
     this.socket.on('build:status', (data: BuildStatus) => {
       console.log('🏗️ SocketService: Legacy build status received:', data);
       this.emit('build:status', data);
+    });
+
+    // Build progress events
+    this.socket.on('build:progress', (data: BuildProgress) => {
+      console.log('🏗️ SocketService: Build progress received:', data);
+      this.emit('build:progress', data);
+    });
+
+    // Flash progress events
+    this.socket.on('flash:progress', (data: FlashProgressEvent) => {
+      console.log('💡 SocketService: Flash progress received:', data);
+      this.emit('flash:progress', data);
+    });
+
+    // Device events
+    this.socket.on('hardware:devices', (data: { devices: Device[], force: boolean, timestamp: string }) => {
+      console.log('🖥️ SocketService: Hardware devices received:', data);
+      this.emit('hardware:devices', data);
+    });
+
+    this.socket.on('hardware:error', (data: { error: string, timestamp: string }) => {
+      console.error('🚨 SocketService: Hardware error received:', data);
+      this.emit('hardware:error', data);
+    });
+
+    this.socket.on('hardware:detection-changed', (data: { enabled: boolean, message: string, timestamp: string }) => {
+      console.log('🔍 SocketService: Hardware detection changed:', data);
+      this.emit('hardware:detection-changed', data);
+    });
+
+    // SPI operation events
+    this.socket.on('spi:progress', (data: SPIProgressEvent) => {
+      console.log('🔄 SocketService: SPI progress received:', data);
+      this.emit('spi:progress', data);
+    });
+
+    this.socket.on('spi:completed', (data: SPICompletedEvent) => {
+      console.log('✅ SocketService: SPI completed received:', data);
+      this.emit('spi:completed', data);
+    });
+
+    this.socket.on('spi:error', (data: SPIErrorEvent) => {
+      console.error('🚨 SocketService: SPI error received:', data);
+      this.emit('spi:error', data);
+    });
+
+    // Device operation events
+    this.socket.on('device:progress', (data: DeviceProgressEvent) => {
+      console.log('🖥️ SocketService: Device progress received:', data);
+      this.emit('device:progress', data);
+    });
+
+    this.socket.on('device:completed', (data: DeviceCompletedEvent) => {
+      console.log('✅ SocketService: Device completed received:', data);
+      this.emit('device:completed', data);
+    });
+
+    this.socket.on('device:error', (data: DeviceErrorEvent) => {
+      console.error('🚨 SocketService: Device error received:', data);
+      this.emit('device:error', data);
     });
   }
 

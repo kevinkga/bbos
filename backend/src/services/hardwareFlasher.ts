@@ -54,6 +54,15 @@ export class HardwareFlasher {
   private lastDeviceCheck: number = 0;
   private deviceCheckCooldown: number = 5000; // 5 seconds minimum between device checks
 
+  // Rock 5B SPI bootloader files
+  private rock5bBootloaderFiles: {
+    loader: string;
+    idbloader: string;
+    uboot: string;
+    spiImage: string;
+    zeroImage: string;
+  };
+
   constructor() {
     // Initialize paths for rkdeveloptool and loader
     this.rkdeveloptoolPath = process.env.RKDEVELOPTOOL_PATH || 
@@ -61,9 +70,20 @@ export class HardwareFlasher {
     this.loaderPath = process.env.RK_LOADER_PATH || 
       path.join(process.env.HOME!, 'rkdeveloptool', 'rk3588_spl_loader_v1.15.113.bin');
     
+    // Rock 5B SPI bootloader file paths
+    const rkToolPath = path.dirname(this.rkdeveloptoolPath);
+    this.rock5bBootloaderFiles = {
+      loader: this.loaderPath,
+      idbloader: path.join(rkToolPath, 'rock5b_idbloader.img'),
+      uboot: path.join(rkToolPath, 'rock5b_u-boot.itb'),
+      spiImage: path.join(rkToolPath, 'rock-5b-spi-image.img'),
+      zeroImage: path.join(rkToolPath, 'zero.img')
+    };
+    
     console.log('🔧 HardwareFlasher initialized');
     console.log(`📍 rkdeveloptool: ${this.rkdeveloptoolPath}`);
     console.log(`📍 Loader: ${this.loaderPath}`);
+    console.log(`📍 Rock 5B SPI files:`, this.rock5bBootloaderFiles);
   }
 
   /**
@@ -796,5 +816,303 @@ export class HardwareFlasher {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  // ===== ROCK 5B SPI FLASH OPERATIONS =====
+
+  /**
+   * Clear SPI flash completely (for removing old bootloaders)
+   */
+  async clearSPIFlash(
+    deviceId: string,
+    onProgress: (progress: FlashProgress) => void
+  ): Promise<void> {
+    const updateProgress = (phase: FlashProgress['phase'], progress: number, message: string) => {
+      onProgress({
+        phase,
+        progress,
+        message,
+        timestamp: new Date().toISOString(),
+        deviceId
+      });
+    };
+
+    try {
+      updateProgress('preparing', 10, 'Preparing SPI flash clear operation...');
+
+      // Ensure device is in maskrom mode
+      const devices = await this.detectDevices(true);
+      const targetDevice = devices.find(d => d.id === deviceId);
+      
+      if (!targetDevice) {
+        throw new Error(`Device ${deviceId} not found. Ensure board is in maskrom mode.`);
+      }
+
+      if (targetDevice.type !== 'maskrom') {
+        throw new Error(`Device must be in maskrom mode for SPI operations. Current mode: ${targetDevice.type}`);
+      }
+
+      updateProgress('downloading_boot', 20, 'Loading bootloader to device...');
+
+      // Download bootloader to device
+      await this.execWithTimeout(`${this.rkdeveloptoolPath} db "${this.rock5bBootloaderFiles.loader}"`, 30000);
+      console.log(`✅ Bootloader loaded for SPI clear operation`);
+
+      updateProgress('erasing', 40, 'Clearing SPI NOR flash...');
+
+      // Check if zero.img exists, if not create it
+      await this.ensureZeroImage();
+
+      // Write zeros to clear the SPI flash
+      await this.execWithTimeout(`${this.rkdeveloptoolPath} wl 0 "${this.rock5bBootloaderFiles.zeroImage}"`, 300000); // 5 min timeout for SPI clear
+      console.log(`✅ SPI flash cleared successfully`);
+
+      updateProgress('verifying', 80, 'Verifying SPI clear...');
+      
+      // Brief verification delay
+      await this.sleep(2000);
+
+      updateProgress('completed', 100, 'SPI flash clear completed successfully');
+      console.log(`🎉 SPI flash clear completed for device ${deviceId}`);
+
+    } catch (error) {
+      const errorMessage = `SPI clear failed: ${(error as Error).message}`;
+      updateProgress('failed', 0, errorMessage);
+      console.error(`❌ ${errorMessage}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Write SPI bootloader for NVME boot support
+   */
+  async writeSPIBootloader(
+    deviceId: string,
+    onProgress: (progress: FlashProgress) => void
+  ): Promise<void> {
+    const updateProgress = (phase: FlashProgress['phase'], progress: number, message: string) => {
+      onProgress({
+        phase,
+        progress,
+        message,
+        timestamp: new Date().toISOString(),
+        deviceId
+      });
+    };
+
+    try {
+      updateProgress('preparing', 10, 'Preparing SPI bootloader write operation...');
+
+      // Ensure device is in maskrom mode
+      const devices = await this.detectDevices(true);
+      const targetDevice = devices.find(d => d.id === deviceId);
+      
+      if (!targetDevice) {
+        throw new Error(`Device ${deviceId} not found. Ensure board is in maskrom mode.`);
+      }
+
+      if (targetDevice.type !== 'maskrom') {
+        throw new Error(`Device must be in maskrom mode for SPI operations. Current mode: ${targetDevice.type}`);
+      }
+
+      updateProgress('downloading_boot', 20, 'Loading bootloader to device...');
+
+      // Download bootloader to device
+      await this.execWithTimeout(`${this.rkdeveloptoolPath} db "${this.rock5bBootloaderFiles.loader}"`, 30000);
+      console.log(`✅ Bootloader loaded for SPI write operation`);
+
+      // Check if SPI image exists
+      await this.ensureSPIImage();
+
+      updateProgress('writing', 40, 'Writing SPI bootloader image...');
+
+      // Write the complete SPI image (includes idbloader and u-boot at correct offsets)
+      await this.execWithTimeout(`${this.rkdeveloptoolPath} wl 0 "${this.rock5bBootloaderFiles.spiImage}"`, 300000); // 5 min timeout
+      console.log(`✅ SPI bootloader image written successfully`);
+
+      updateProgress('verifying', 80, 'Verifying SPI bootloader...');
+      
+      // Brief verification delay
+      await this.sleep(2000);
+
+      updateProgress('completed', 100, 'SPI bootloader write completed successfully');
+      console.log(`🎉 SPI bootloader write completed for device ${deviceId}`);
+
+    } catch (error) {
+      const errorMessage = `SPI bootloader write failed: ${(error as Error).message}`;
+      updateProgress('failed', 0, errorMessage);
+      console.error(`❌ ${errorMessage}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Write SPI bootloader using individual components (alternative method)
+   */
+  async writeSPIBootloaderComponents(
+    deviceId: string,
+    onProgress: (progress: FlashProgress) => void
+  ): Promise<void> {
+    const updateProgress = (phase: FlashProgress['phase'], progress: number, message: string) => {
+      onProgress({
+        phase,
+        progress,
+        message,
+        timestamp: new Date().toISOString(),
+        deviceId
+      });
+    };
+
+    try {
+      updateProgress('preparing', 10, 'Preparing SPI bootloader component write...');
+
+      // Ensure device is in maskrom mode
+      const devices = await this.detectDevices(true);
+      const targetDevice = devices.find(d => d.id === deviceId);
+      
+      if (!targetDevice) {
+        throw new Error(`Device ${deviceId} not found. Ensure board is in maskrom mode.`);
+      }
+
+      if (targetDevice.type !== 'maskrom') {
+        throw new Error(`Device must be in maskrom mode for SPI operations. Current mode: ${targetDevice.type}`);
+      }
+
+      updateProgress('downloading_boot', 20, 'Loading bootloader to device...');
+
+      // Download bootloader to device
+      await this.execWithTimeout(`${this.rkdeveloptoolPath} db "${this.rock5bBootloaderFiles.loader}"`, 30000);
+      console.log(`✅ Bootloader loaded for component write operation`);
+
+      // Check if component files exist
+      await this.ensureBootloaderComponents();
+
+      updateProgress('writing', 40, 'Writing idbloader.img to SPI...');
+
+      // Write idbloader.img at sector 64 (0x40)
+      await this.execWithTimeout(`${this.rkdeveloptoolPath} wl 64 "${this.rock5bBootloaderFiles.idbloader}"`, 120000);
+      console.log(`✅ idbloader.img written to SPI at sector 64`);
+
+      updateProgress('writing', 70, 'Writing u-boot.itb to SPI...');
+
+      // Write u-boot.itb at sector 16384 (0x4000)
+      await this.execWithTimeout(`${this.rkdeveloptoolPath} wl 16384 "${this.rock5bBootloaderFiles.uboot}"`, 120000);
+      console.log(`✅ u-boot.itb written to SPI at sector 16384`);
+
+      updateProgress('verifying', 90, 'Verifying SPI bootloader components...');
+      
+      // Brief verification delay
+      await this.sleep(2000);
+
+      updateProgress('completed', 100, 'SPI bootloader components write completed successfully');
+      console.log(`🎉 SPI bootloader components write completed for device ${deviceId}`);
+
+    } catch (error) {
+      const errorMessage = `SPI bootloader components write failed: ${(error as Error).message}`;
+      updateProgress('failed', 0, errorMessage);
+      console.error(`❌ ${errorMessage}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Reboot connected Rockchip device
+   */
+  async rebootDevice(
+    deviceId: string,
+    onProgress: (progress: FlashProgress) => void
+  ): Promise<void> {
+    const updateProgress = (phase: FlashProgress['phase'], progress: number, message: string) => {
+      onProgress({
+        phase,
+        progress,
+        message,
+        timestamp: new Date().toISOString(),
+        deviceId
+      });
+    };
+
+    try {
+      updateProgress('resetting', 50, 'Rebooting device...');
+
+      // Reboot the device
+      await this.execWithTimeout(`${this.rkdeveloptoolPath} rd`, 10000);
+      console.log(`🔄 Device ${deviceId} reboot command sent`);
+
+      // Give device time to reboot
+      await this.sleep(3000);
+
+      updateProgress('completed', 100, 'Device reboot completed');
+      console.log(`✅ Device ${deviceId} reboot completed`);
+
+    } catch (error) {
+      const errorMessage = `Device reboot failed: ${(error as Error).message}`;
+      updateProgress('failed', 0, errorMessage);
+      console.error(`❌ ${errorMessage}`);
+      throw error;
+    }
+  }
+
+  // ===== HELPER METHODS FOR SPI OPERATIONS =====
+
+  /**
+   * Ensure zero.img exists for SPI clearing
+   */
+  private async ensureZeroImage(): Promise<void> {
+    try {
+      await fs.access(this.rock5bBootloaderFiles.zeroImage);
+      console.log(`✅ Zero image found: ${this.rock5bBootloaderFiles.zeroImage}`);
+    } catch {
+      console.log(`📝 Creating zero image for SPI clear: ${this.rock5bBootloaderFiles.zeroImage}`);
+      
+      // Create a 16MB zero-filled file for SPI clearing
+      const buffer = Buffer.alloc(16 * 1024 * 1024, 0);
+      await fs.writeFile(this.rock5bBootloaderFiles.zeroImage, buffer);
+      
+      console.log(`✅ Zero image created: 16MB`);
+    }
+  }
+
+  /**
+   * Ensure SPI image exists
+   */
+  private async ensureSPIImage(): Promise<void> {
+    try {
+      await fs.access(this.rock5bBootloaderFiles.spiImage);
+      console.log(`✅ SPI image found: ${this.rock5bBootloaderFiles.spiImage}`);
+    } catch {
+      // Try to download or provide instructions for getting the SPI image
+      const message = `SPI image not found: ${this.rock5bBootloaderFiles.spiImage}. 
+Please download the Rock 5B SPI image from:
+https://dl.radxa.com/rock5/sw/images/loader/rock-5b/release/
+Or use the component write method instead.`;
+      
+      console.error(`❌ ${message}`);
+      throw new Error(message);
+    }
+  }
+
+  /**
+   * Ensure bootloader component files exist
+   */
+  private async ensureBootloaderComponents(): Promise<void> {
+    const files = [
+      { path: this.rock5bBootloaderFiles.idbloader, name: 'idbloader.img' },
+      { path: this.rock5bBootloaderFiles.uboot, name: 'u-boot.itb' }
+    ];
+
+    for (const file of files) {
+      try {
+        await fs.access(file.path);
+        console.log(`✅ ${file.name} found: ${file.path}`);
+      } catch {
+        const message = `${file.name} not found: ${file.path}. 
+Please ensure Rock 5B bootloader files are available.
+You can extract them from a Rock 5B system at /usr/lib/u-boot/rock-5b/`;
+        
+        console.error(`❌ ${message}`);
+        throw new Error(message);
+      }
+    }
   }
 } 

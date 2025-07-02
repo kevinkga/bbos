@@ -403,8 +403,9 @@ app.get('/api/builds/:buildId/artifacts/:artifactName/compressed', async (req: e
     const stats = await fs.stat(artifactPath);
     let bytesRead = 0;
     
-    readStream.on('data', (chunk: Buffer) => {
-      bytesRead += chunk.length;
+    readStream.on('data', (chunk: string | Buffer) => {
+      const chunkLength = Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(chunk);
+      bytesRead += chunkLength;
       // Emit progress updates via Socket.IO if needed
       const progress = (bytesRead / stats.size) * 100;
       io.emit('compression:progress', {
@@ -517,6 +518,292 @@ app.get('/api/hardware/flash/:flashJobId', (req: express.Request, res: express.R
 app.get('/api/hardware/flash', (req: express.Request, res: express.Response) => {
   const flashJobs = hardwareFlasher.getAllFlashJobs();
   res.json({ flashJobs });
+});
+
+// ===== ROCK 5B SPI FLASH OPERATIONS API =====
+
+// Clear SPI flash endpoint
+app.post('/api/hardware/spi/clear', async (req: express.Request, res: express.Response) => {
+  try {
+    const { deviceId } = req.body;
+    
+    if (!deviceId) {
+      return res.status(400).json({ error: 'deviceId is required' });
+    }
+
+    console.log(`🧽 SPI clear request for device ${deviceId}`);
+
+    // Generate operation ID for tracking
+    const operationId = uuidv4();
+
+    // Start SPI clear process
+    hardwareFlasher.clearSPIFlash(
+      deviceId,
+      (progress: FlashProgress) => {
+        // Emit progress updates via WebSocket
+        io.emit('spi:progress', {
+          operationId,
+          operation: 'clear',
+          deviceId,
+          ...progress
+        });
+      }
+    ).then(() => {
+      console.log(`✅ SPI clear completed for device ${deviceId}`);
+      io.emit('spi:completed', {
+        operationId,
+        operation: 'clear',
+        deviceId,
+        timestamp: new Date().toISOString()
+      });
+    }).catch((error) => {
+      console.error(`❌ SPI clear failed for device ${deviceId}:`, error);
+      io.emit('spi:error', {
+        operationId,
+        operation: 'clear',
+        deviceId,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    res.status(200).json({
+      message: 'SPI clear operation started',
+      operationId,
+      deviceId
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to start SPI clear operation:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// Write SPI bootloader endpoint
+app.post('/api/hardware/spi/write-bootloader', async (req: express.Request, res: express.Response) => {
+  try {
+    const { deviceId, method = 'complete' } = req.body;
+    
+    if (!deviceId) {
+      return res.status(400).json({ error: 'deviceId is required' });
+    }
+
+    console.log(`🛠️ SPI bootloader write request for device ${deviceId} using ${method} method`);
+
+    // Generate operation ID for tracking
+    const operationId = uuidv4();
+
+    // Choose write method
+    const writeMethod = method === 'components' ? 
+      hardwareFlasher.writeSPIBootloaderComponents.bind(hardwareFlasher) : 
+      hardwareFlasher.writeSPIBootloader.bind(hardwareFlasher);
+
+    // Start SPI bootloader write process
+    writeMethod(
+      deviceId,
+      (progress: FlashProgress) => {
+        // Emit progress updates via WebSocket
+        io.emit('spi:progress', {
+          operationId,
+          operation: 'write-bootloader',
+          deviceId,
+          method,
+          ...progress
+        });
+      }
+    ).then(() => {
+      console.log(`✅ SPI bootloader write completed for device ${deviceId}`);
+      io.emit('spi:completed', {
+        operationId,
+        operation: 'write-bootloader',
+        deviceId,
+        method,
+        timestamp: new Date().toISOString()
+      });
+    }).catch((error) => {
+      console.error(`❌ SPI bootloader write failed for device ${deviceId}:`, error);
+      io.emit('spi:error', {
+        operationId,
+        operation: 'write-bootloader',
+        deviceId,
+        method,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    res.status(200).json({
+      message: 'SPI bootloader write operation started',
+      operationId,
+      deviceId,
+      method
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to start SPI bootloader write operation:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// Device reboot endpoint
+app.post('/api/hardware/device/reboot', async (req: express.Request, res: express.Response) => {
+  try {
+    const { deviceId } = req.body;
+    
+    if (!deviceId) {
+      return res.status(400).json({ error: 'deviceId is required' });
+    }
+
+    console.log(`🔄 Device reboot request for device ${deviceId}`);
+
+    // Generate operation ID for tracking
+    const operationId = uuidv4();
+
+    // Start device reboot process
+    hardwareFlasher.rebootDevice(
+      deviceId,
+      (progress: FlashProgress) => {
+        // Emit progress updates via WebSocket
+        io.emit('device:progress', {
+          operationId,
+          operation: 'reboot',
+          deviceId,
+          ...progress
+        });
+      }
+    ).then(() => {
+      console.log(`✅ Device reboot completed for device ${deviceId}`);
+      io.emit('device:completed', {
+        operationId,
+        operation: 'reboot',
+        deviceId,
+        timestamp: new Date().toISOString()
+      });
+    }).catch((error) => {
+      console.error(`❌ Device reboot failed for device ${deviceId}:`, error);
+      io.emit('device:error', {
+        operationId,
+        operation: 'reboot',
+        deviceId,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    res.status(200).json({
+      message: 'Device reboot operation started',
+      operationId,
+      deviceId
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to start device reboot operation:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// Get SPI operation capabilities
+app.get('/api/hardware/spi/capabilities', async (req: express.Request, res: express.Response) => {
+  try {
+    const capabilities = await hardwareFlasher.getCapabilities();
+    
+    res.json({
+      available: capabilities.available,
+      supportedOperations: [
+        'clear-spi',
+        'write-bootloader',
+        'device-reboot'
+      ],
+      supportedMethods: {
+        'write-bootloader': ['complete', 'components']
+      },
+      requiredFiles: {
+        loader: 'rk3588_spl_loader_v1.15.113.bin',
+        spiImage: 'rock-5b-spi-image.img (optional, for complete method)',
+        components: ['rock5b_idbloader.img', 'rock5b_u-boot.itb']
+      },
+      documentation: {
+        clearSPI: 'Completely clears SPI NOR flash to remove old bootloaders',
+        writeBootloader: 'Writes Rock 5B bootloader to SPI for NVME boot support',
+        rebootDevice: 'Reboots the connected Rockchip device'
+      }
+    });
+  } catch (error) {
+    console.error('❌ Failed to get SPI capabilities:', error);
+    res.status(500).json({ error: 'Failed to get SPI capabilities' });
+  }
+});
+
+// Get bootloader files for SPI operations
+app.get('/api/hardware/spi/bootloader/:filename', async (req: express.Request, res: express.Response) => {
+  try {
+    const { filename } = req.params;
+    
+    // Security: only allow specific bootloader files
+    const allowedFiles = [
+      'rock5b_idbloader.img',
+      'rock5b_u-boot.itb',
+      'rk3588_spl_loader_v1.15.113.bin'
+    ];
+    
+    if (!allowedFiles.includes(filename)) {
+      return res.status(400).json({ error: 'Invalid bootloader file requested' });
+    }
+    
+    // Get file path from hardware flasher
+    const capabilities = await hardwareFlasher.getCapabilities();
+    if (!capabilities.available) {
+      return res.status(503).json({ error: 'Hardware flashing not available - rkdeveloptool not found' });
+    }
+    
+    // Determine file path based on filename
+    let filePath: string;
+    const homeDir = process.env.HOME;
+    const rkdevDir = path.join(homeDir!, 'rkdeveloptool');
+    
+    switch (filename) {
+      case 'rock5b_idbloader.img':
+        filePath = path.join(rkdevDir, 'rock5b_idbloader.img');
+        break;
+      case 'rock5b_u-boot.itb':
+        filePath = path.join(rkdevDir, 'rock5b_u-boot.itb');
+        break;
+      case 'rk3588_spl_loader_v1.15.113.bin':
+        filePath = path.join(rkdevDir, 'rk3588_spl_loader_v1.15.113.bin');
+        break;
+      default:
+        return res.status(400).json({ error: 'Unknown bootloader file' });
+    }
+    
+    // Check if file exists
+    try {
+      await fs.access(filePath);
+    } catch (error) {
+      return res.status(404).json({ 
+        error: `Bootloader file not found: ${filename}`,
+        hint: `Make sure ${filename} exists in ${rkdevDir}`
+      });
+    }
+    
+    // Get file stats
+    const stats = await fs.stat(filePath);
+    
+    // Set appropriate headers
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Length', stats.size);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+    
+    // Stream the file
+    const readStream = fsSync.createReadStream(filePath);
+    readStream.pipe(res);
+    
+    console.log(`📁 Serving bootloader file: ${filename} (${(stats.size / 1024).toFixed(1)} KB)`);
+    
+  } catch (error) {
+    console.error('❌ Failed to serve bootloader file:', error);
+    res.status(500).json({ error: 'Failed to serve bootloader file' });
+  }
 });
 
 // Helper function to get content type

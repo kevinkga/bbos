@@ -316,6 +316,100 @@ export interface PanelComponentProps extends BaseComponentProps {
   onClose?: () => void
 }
 
+// Hardware Device Types
+export interface Device {
+  id: string
+  name: string
+  type: 'maskrom' | 'loader' | 'normal'
+  chipType?: string
+  connected: boolean
+  capabilities?: string[]
+}
+
+// Flash Progress and Event Types
+export interface FlashProgressEvent {
+  flashJobId: string
+  buildId: string
+  deviceId: string
+  storageTarget?: string
+  phase: 'connecting' | 'writing' | 'verifying' | 'completed' | 'failed'
+  progress: number
+  message: string
+  timestamp: string
+}
+
+export interface FlashCompletedEvent {
+  flashJobId: string
+  buildId: string
+  deviceId: string
+  storageTarget?: string
+  timestamp: string
+}
+
+export interface FlashFailedEvent {
+  flashJobId: string
+  buildId: string
+  deviceId: string
+  storageTarget?: string
+  error: string
+  timestamp: string
+}
+
+// SPI Operation Event Types
+export interface SPIProgressEvent {
+  operationId: string
+  operation: 'clear' | 'write-bootloader'
+  deviceId: string
+  method?: string
+  phase: 'connecting' | 'writing' | 'verifying' | 'completed' | 'failed'
+  progress: number
+  message: string
+  timestamp: string
+}
+
+export interface SPICompletedEvent {
+  operationId: string
+  operation: 'clear' | 'write-bootloader'
+  deviceId: string
+  method?: string
+  timestamp: string
+}
+
+export interface SPIErrorEvent {
+  operationId: string
+  operation: 'clear' | 'write-bootloader'
+  deviceId: string
+  method?: string
+  error: string
+  timestamp: string
+}
+
+// Device Operation Event Types
+export interface DeviceProgressEvent {
+  operationId: string
+  operation: 'reboot'
+  deviceId: string
+  phase: 'connecting' | 'rebooting' | 'completed' | 'failed'
+  progress: number
+  message: string
+  timestamp: string
+}
+
+export interface DeviceCompletedEvent {
+  operationId: string
+  operation: 'reboot'
+  deviceId: string
+  timestamp: string
+}
+
+export interface DeviceErrorEvent {
+  operationId: string
+  operation: 'reboot'
+  deviceId: string
+  error: string
+  timestamp: string
+}
+
 // Export all types
 export * from './flexlayout'
 export * from './rjsf' 

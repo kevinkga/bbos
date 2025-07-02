@@ -17,7 +17,8 @@ import {
   Empty,
   Spin,
   message,
-  Modal
+  Modal,
+  Checkbox
 } from 'antd';
 import { 
   UsbOutlined, 
@@ -28,10 +29,12 @@ import {
   DesktopOutlined,
   GlobalOutlined,
   InfoCircleOutlined,
-  ClockCircleOutlined
+  ClockCircleOutlined,
+  WarningOutlined,
+  SafetyOutlined
 } from '@ant-design/icons';
 import { WebSerialFlasher, SerialDevice, FlashProgressWeb, webSerialSupported } from '../services/webSerialFlasher';
-import { webUSBRockchipFlasher, RockchipDevice, isWebUSBSupported, WebUSBStorageDevice } from '../services/webUSBFlasher';
+import { WebUSBRockchipFlasher, RockchipDevice, WebUSBStorageDevice } from '../services/webUSBFlasher';
 import { compressionService, CompressionProgress } from '../services/compressionService';
 import { FlashInstructions } from '../components/FlashInstructions';
 import { SerialDebugInfo } from '../components/SerialDebugInfo';
@@ -95,9 +98,16 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
   const [compressionProgress, setCompressionProgress] = useState<CompressionProgress | null>(null);
   const [loadingDevices, setLoadingDevices] = useState(false);
   
+  // SPI and reboot functionality state
+  const [spiOperationMode, setSpiOperationMode] = useState<'normal' | 'spi-clear' | 'spi-bootloader'>('normal');
+  const [rebootAfterFlash, setRebootAfterFlash] = useState(false);
+  const [isSpiOperation, setIsSpiOperation] = useState(false);
+  
   // Use useRef to maintain stable instance across renders
   const webSerialFlasher = useRef(new WebSerialFlasher()).current;
   const completedBuilds = builds.filter(build => build.status === 'completed');
+  
+  // Remove socket integration - using frontend WebUSB operations instead
 
   // Fetch serial devices (browser)
   const fetchSerialDevices = async () => {
@@ -113,10 +123,10 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
 
   // Fetch Rockchip USB devices (WebUSB)
   const fetchRockchipDevices = async () => {
-    if (!isWebUSBSupported()) return;
+    if (!WebUSBRockchipFlasher.isSupported()) return;
     
     try {
-      const devices = await webUSBRockchipFlasher.getAvailableDevices();
+      const devices = await WebUSBRockchipFlasher.getAvailableDevices();
       setRockchipDevices(devices);
     } catch (error) {
       console.error('Failed to fetch Rockchip devices:', error);
@@ -128,7 +138,7 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
     setLoadingStorage(true);
     try {
       console.log('🔍 Detecting WebUSB storage devices...');
-      const devices = await webUSBRockchipFlasher.detectStorageDevices(rkDevice);
+      const devices = await WebUSBRockchipFlasher.detectStorageDevices(rkDevice);
       setWebUSBStorageDevices(devices);
       
       // Auto-select recommended storage
@@ -245,133 +255,100 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
 
   // Browser flash implementation
   const handleBrowserFlash = async () => {
-    const device = await webSerialFlasher.requestDevice();
-    if (!device) {
-      setIsFlashing(false);
+    if (!selectedDevice || !('port' in selectedDevice)) {
+      message.error('Please select a valid serial device');
       return;
     }
 
-    // Download the specific image file using the artifacts endpoint
-    const imageUrl = `http://localhost:3001/api/builds/${selectedBuild?.id}/artifacts/${encodeURIComponent(selectedImageFile)}`;
-    
-    const buildResponse = await fetch(imageUrl);
-    if (!buildResponse.ok) {
-      throw new Error(`Failed to download image file: ${selectedImageFile}`);
+    try {
+      const artifact = selectedBuild?.artifacts?.find(a => a.name === selectedImageFile);
+      if (!artifact) {
+        throw new Error('Selected image file not found');
+      }
+
+      const response = await fetch(artifact.url);
+      const blob = await response.blob();
+      const file = new File([blob], selectedImageFile, { type: 'application/octet-stream' });
+
+      await webSerialFlasher.flashImage(
+        file,
+        (progress) => setFlashProgress(progress)
+      );
+      message.success('Flash completed successfully');
+    } catch (error) {
+      console.error('Browser flash failed:', error);
+      throw error;
     }
-
-    const blob = await buildResponse.blob();
-    const file = new File([blob], selectedImageFile, { type: 'application/octet-stream' });
-
-    await webSerialFlasher.connect();
-    await webSerialFlasher.flashImage(file, setFlashProgress);
-    await webSerialFlasher.disconnect();
   };
 
   // WebUSB flash implementation with compression
   const handleWebUSBFlash = async () => {
+    if (!selectedDevice || !('chipType' in selectedDevice)) {
+      message.error('Please select a valid Rockchip device');
+      return;
+    }
+
+    if (!selectedBuild) {
+      message.error('Please select a build');
+      return;
+    }
+
+    const rkDevice = selectedDevice as RockchipDevice;
+    
     try {
-      message.info('Requesting device access...');
-      const device = await webUSBRockchipFlasher.requestDevice();
-      if (!device) {
-        setIsFlashing(false);
-        return;
+      // Get selected storage device
+      const storage = webUSBStorageDevices.find(d => d.type === selectedStorage);
+      if (!storage) {
+        throw new Error('Selected storage device not found');
       }
 
-      message.success(`Device selected: ${device.chipType} v${device.version}`);
-      console.log('📱 Selected device:', device);
+      // Fetch image data
+      const artifact = selectedBuild.artifacts?.find(a => a.name === selectedImageFile);
+      if (!artifact) {
+        throw new Error('Selected image file not found');
+      }
 
-      // Show compression capabilities
-      const capabilities = compressionService.getCapabilities();
-      console.log(`🔧 Using ${capabilities.recommended} decompression for optimal performance`);
+      // Download and decompress image
+      const response = await fetch(artifact.url);
+      const compressedData = await response.arrayBuffer();
       
-      // Download image using optimal compression strategy
-      message.info(`Downloading image (${capabilities.recommendation})...`);
-      
-      const decompressedData = await compressionService.downloadImage(
-        selectedBuild!.id,
+      setCompressionProgress({ progress: 0, decompressedBytes: 0, speed: 0 });
+      const imageData = await compressionService.downloadImage(
+        selectedBuild.id,
         selectedImageFile,
-        (progress) => {
-          setCompressionProgress(progress);
-          // Update flash progress to show download progress
-          setFlashProgress({
-            phase: 'downloading',
-            progress: progress.progress,
-            message: `Downloading... ${progress.speed.toFixed(1)} MB/s`,
-            bytesTransferred: progress.decompressedBytes,
-            totalBytes: progress.totalBytes
-          });
-        }
+        (progress) => setCompressionProgress(progress)
       );
 
-      message.success(`Image decompressed: ${(decompressedData.length / (1024 * 1024)).toFixed(1)} MB`);
-      console.log(`📦 Decompression complete: ${(decompressedData.length / (1024 * 1024)).toFixed(1)} MB`);
-      
-      // Get selected storage device for WebUSB
-      const selectedStorageDevice = webUSBStorageDevices.find(d => d.type === selectedStorage);
-      if (selectedStorage && !selectedStorageDevice) {
-        throw new Error(`Selected storage device (${selectedStorage}) not found or not available`);
+      // Flash image using WebUSB
+      await WebUSBRockchipFlasher.flashImage(
+        rkDevice,
+        imageData.buffer,
+        (progress) => {
+          // Map WebUSB flash progress to web flash progress format
+          const webProgress: FlashProgressWeb = {
+            phase: progress.phase === 'detecting' ? 'connecting' :
+                   progress.phase === 'loading_bootloader' ? 'preparing' :
+                   progress.phase === 'writing' ? 'flashing' :
+                   progress.phase,
+            progress: progress.progress,
+            message: progress.message,
+            bytesTransferred: progress.bytesWritten,
+            totalBytes: progress.totalBytes
+          };
+          setFlashProgress(webProgress);
+        },
+        storage
+      );
+
+      // Reboot device if requested
+      if (rebootAfterFlash) {
+        await handleDeviceReboot();
       }
-      
-      // Start flashing with progress updates and storage selection
-      await webUSBRockchipFlasher.flashImage(device, decompressedData.buffer, (progress) => {
-        console.log('📊 Flash progress:', progress);
-        setFlashProgress({
-          phase: progress.phase as any,
-          progress: progress.progress,
-          message: progress.message,
-          bytesTransferred: progress.bytesWritten,
-          totalBytes: progress.totalBytes
-        });
-        
-        // Show progress messages in UI
-        if (progress.phase === 'connecting' && progress.progress === 15) {
-          message.info('Testing device communication...');
-        } else if (progress.phase === 'loading_bootloader') {
-          message.success('Device communication established!');
-        } else if (progress.phase === 'completed') {
-          message.success('Flash completed successfully!');
-        } else if (progress.phase === 'failed') {
-          message.error(`Flash failed: ${progress.message}`);
-        }
-      }, selectedStorageDevice);
-      
+
+      message.success('Flash completed successfully');
     } catch (error) {
-      console.error('❌ WebUSB Flash error:', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      
-      // Provide more helpful error messages
-      if (errorMessage.includes('Device communication test failed')) {
-        message.error('Device communication test failed. Check console for detailed logs.');
-        
-        // Add debug info modal or better error display
-        Modal.error({
-          title: 'Device Communication Failed',
-          content: (
-            <div>
-              <p>The device communication test failed. This could be due to:</p>
-              <ul>
-                <li>Device not in the correct mode (try putting it in maskrom/download mode)</li>
-                <li>Wrong USB endpoints detected</li>
-                <li>Device driver issues</li>
-                <li>USB communication protocol mismatch</li>
-              </ul>
-              <p>Check the browser console for detailed logs.</p>
-              <p><strong>Debug info:</strong> Open browser DevTools and look for messages starting with 🧪, 📋, or ❌</p>
-            </div>
-          ),
-          width: 600
-        });
-      } else {
-        message.error(errorMessage);
-      }
-      
-      setFlashProgress({
-        phase: 'failed',
-        progress: 0,
-        message: errorMessage
-      });
-    } finally {
-      setIsFlashing(false);
+      console.error('WebUSB flash failed:', error);
+      throw error;
     }
   };
 
@@ -403,6 +380,9 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
     setIsFlashing(false);
     setFlashProgress(null);
     setCompressionProgress(null);
+    setSpiOperationMode('normal');
+    setRebootAfterFlash(false);
+    setIsSpiOperation(false);
   };
 
   // Get image files from selected build
@@ -435,22 +415,128 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
       description: 'Choose how to flash',
       icon: <UsbOutlined />
     },
+    ...(flashMethod === 'webusb' ? [{
+      title: 'Operation Mode',
+      description: 'Choose operation type',
+      icon: <InfoCircleOutlined />
+    }] : []),
     {
       title: 'Select Device',
       description: flashMethod === 'webusb' ? 'Choose Rockchip device in maskrom mode' : 'Choose device with serial interface',
       icon: flashMethod === 'webusb' ? <UsbOutlined /> : <GlobalOutlined />
     },
-    ...(flashMethod === 'webusb' && webUSBStorageDevices.length > 0 ? [{
+    ...(flashMethod === 'webusb' && webUSBStorageDevices.length > 0 && spiOperationMode === 'normal' ? [{
       title: 'Select Storage',
       description: 'Choose target storage device',
       icon: <InfoCircleOutlined />
     }] : []),
     {
-      title: 'Flash Image',
-      description: 'Start the flashing process',
+      title: spiOperationMode === 'spi-clear' ? 'Clear SPI' : 
+             spiOperationMode === 'spi-bootloader' ? 'Write Bootloader' : 'Flash Image',
+      description: spiOperationMode === 'spi-clear' ? 'Clear SPI flash chip' :
+                   spiOperationMode === 'spi-bootloader' ? 'Write bootloader to SPI' : 'Start the flashing process',
       icon: <CheckCircleOutlined />
     }
   ];
+
+  // Handle SPI clear operation using backend API (more reliable than WebUSB)
+  const handleSPIClear = async () => {
+    if (!selectedDevice || !('chipType' in selectedDevice)) {
+      message.error('Please select a valid Rockchip device');
+      return;
+    }
+
+    const rkDevice = selectedDevice as RockchipDevice;
+    setIsSpiOperation(true);
+
+    try {
+      await WebUSBRockchipFlasher.clearSPIFlash(
+        rkDevice,
+        (progress) => {
+          // Map WebUSB flash progress to web flash progress format
+          const webProgress: FlashProgressWeb = {
+            phase: progress.phase === 'detecting' ? 'connecting' :
+                   progress.phase === 'loading_bootloader' ? 'preparing' :
+                   progress.phase === 'writing' ? 'flashing' :
+                   progress.phase,
+            progress: progress.progress,
+            message: progress.message,
+            bytesTransferred: progress.bytesWritten,
+            totalBytes: progress.totalBytes
+          };
+          setFlashProgress(webProgress);
+        }
+      );
+      message.success('SPI flash cleared successfully');
+    } catch (error) {
+      console.error('SPI clear failed:', error);
+      message.error('Failed to clear SPI flash');
+    } finally {
+      setIsSpiOperation(false);
+    }
+  };
+
+  // Handle SPI bootloader write
+  const handleSPIBootloaderWrite = async () => {
+    if (!selectedDevice || !('chipType' in selectedDevice)) {
+      message.error('Please select a valid Rockchip device');
+      return;
+    }
+
+    const rkDevice = selectedDevice as RockchipDevice;
+    setIsSpiOperation(true);
+
+    try {
+      await WebUSBRockchipFlasher.writeSPIBootloaderAuto(
+        rkDevice,
+        (progress) => {
+          // Map WebUSB flash progress to web flash progress format
+          const webProgress: FlashProgressWeb = {
+            phase: progress.phase === 'detecting' ? 'connecting' :
+                   progress.phase === 'loading_bootloader' ? 'preparing' :
+                   progress.phase === 'writing' ? 'flashing' :
+                   progress.phase,
+            progress: progress.progress,
+            message: progress.message,
+            bytesTransferred: progress.bytesWritten,
+            totalBytes: progress.totalBytes
+          };
+          setFlashProgress(webProgress);
+        }
+      );
+      message.success('SPI bootloader written successfully');
+    } catch (error) {
+      console.error('SPI bootloader write failed:', error);
+      message.error('Failed to write SPI bootloader');
+    } finally {
+      setIsSpiOperation(false);
+    }
+  };
+
+  // Handle device reboot
+  const handleDeviceReboot = async () => {
+    if (!selectedDevice || flashMethod !== 'webusb' || !('chipType' in selectedDevice)) {
+      message.error('Device reboot requires a WebUSB Rockchip device');
+      return;
+    }
+
+    try {
+      message.info('Rebooting device...');
+      await WebUSBRockchipFlasher.rebootDevice(selectedDevice as RockchipDevice);
+      message.success('Device reboot command sent successfully');
+      
+      // Clear device selection since device will disconnect
+      setTimeout(() => {
+        setSelectedDevice(null);
+        setRockchipDevices([]);
+        setSerialDevices([]);
+        message.info('Device disconnected after reboot. Reconnect if needed.');
+      }, 2000);
+    } catch (error) {
+      console.error('Device reboot failed:', error);
+      message.error(`Device reboot failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
 
   return (
     <div style={{ 
@@ -597,8 +683,6 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
               </Card>
             )}
 
-
-
             {/* Step 3: Method Selection */}
             {currentStep === 2 && (
               <Card 
@@ -639,7 +723,7 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
                     
                     <Radio.Button 
                       value="webusb" 
-                      disabled={!isWebUSBSupported()}
+                      disabled={!WebUSBRockchipFlasher.isSupported()}
                       onClick={() => handleMethodSelect('webusb')}
                       style={{ 
                         height: 'auto', 
@@ -650,7 +734,7 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
                       <div>
                         <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '4px' }}>
                           <UsbOutlined style={{ marginRight: '8px' }} />
-                          WebUSB Maskrom Method {!isWebUSBSupported() && '(Not Supported)'}
+                          WebUSB Maskrom Method {!WebUSBRockchipFlasher.isSupported() && '(Not Supported)'}
                         </div>
                         <div style={{ color: colors.text.secondary }}>
                           Direct Rockchip maskrom flashing via WebUSB. Recommended for NVME.
@@ -662,8 +746,97 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
               </Card>
             )}
 
+            {/* Step 3.5: Operation Mode Selection (WebUSB only) */}
+            {currentStep === 3 && flashMethod === 'webusb' && (
+              <Card 
+                title={
+                  <Space>
+                    <InfoCircleOutlined style={{ color: colors.accent[500] }} />
+                    <span>Step 3.5: Choose Operation Mode</span>
+                  </Space>
+                }
+                style={{ backgroundColor: colors.background.primary }}
+              >
+                <Alert
+                  message="Operation Mode"
+                  description="Choose what type of operation you want to perform with your Rockchip device."
+                  type="info"
+                  showIcon
+                  style={{ marginBottom: '16px' }}
+                />
+                
+                <Radio.Group 
+                  value={spiOperationMode} 
+                  onChange={(e) => {
+                    setSpiOperationMode(e.target.value);
+                    setCurrentStep(currentStep + 1);
+                  }}
+                  style={{ width: '100%' }}
+                >
+                  <div style={{ display: 'grid', gap: '12px' }}>
+                    <Radio.Button 
+                      value="normal"
+                      style={{ 
+                        height: 'auto', 
+                        padding: '12px',
+                        textAlign: 'left'
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '4px' }}>
+                          <ThunderboltOutlined style={{ marginRight: '8px' }} />
+                          Normal Image Flashing
+                        </div>
+                        <div style={{ color: colors.text.secondary }}>
+                          Flash full OS image to eMMC, SD card, or NVMe storage
+                        </div>
+                      </div>
+                    </Radio.Button>
+                    
+                    <Radio.Button 
+                      value="spi-clear"
+                      style={{ 
+                        height: 'auto', 
+                        padding: '12px',
+                        textAlign: 'left'
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '4px' }}>
+                          <ExclamationCircleOutlined style={{ marginRight: '8px' }} />
+                          Clear SPI Flash
+                        </div>
+                        <div style={{ color: colors.text.secondary }}>
+                          Completely erase SPI NOR flash (useful for removing old bootloaders)
+                        </div>
+                      </div>
+                    </Radio.Button>
+                    
+                    <Radio.Button 
+                      value="spi-bootloader"
+                      style={{ 
+                        height: 'auto', 
+                        padding: '12px',
+                        textAlign: 'left'
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '4px' }}>
+                          <DesktopOutlined style={{ marginRight: '8px' }} />
+                          Write SPI Bootloader
+                        </div>
+                        <div style={{ color: colors.text.secondary }}>
+                          Write bootloader to SPI flash for NVMe boot support
+                        </div>
+                      </div>
+                    </Radio.Button>
+                  </div>
+                </Radio.Group>
+              </Card>
+            )}
+
             {/* Step 4: Device Selection */}
-            {currentStep === 3 && (
+            {currentStep === (flashMethod === 'webusb' ? 4 : 3) && (
               <Card 
                 title={
                   <Space>
@@ -694,7 +867,7 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
                           icon={<UsbOutlined />} 
                           onClick={async () => {
                             try {
-                              await webUSBRockchipFlasher.requestDevice();
+                              await WebUSBRockchipFlasher.requestDevice();
                               await fetchRockchipDevices();
                             } catch (error) {
                               console.error('Failed to request Rockchip device:', error);
@@ -804,12 +977,12 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
             )}
 
             {/* Storage Selection Step (WebUSB only) */}
-            {currentStep === 4 && (flashMethod === 'webusb' && webUSBStorageDevices.length > 0) && (
+            {currentStep === (flashMethod === 'webusb' ? 5 : 4) && (flashMethod === 'webusb' && webUSBStorageDevices.length > 0) && spiOperationMode === 'normal' && (
               <Card 
                 title={
                   <Space>
                     <InfoCircleOutlined style={{ color: colors.accent[500] }} />
-                    <span>Step 5: Select Target Storage Device</span>
+                    <span>Step {flashMethod === 'webusb' ? '6' : '5'}: Select Target Storage Device</span>
                   </Space>
                 }
                 style={{ backgroundColor: colors.background.primary }}
@@ -874,59 +1047,183 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
             )}
 
             {/* Final Flash Step */}
-            {currentStep >= 4 && (!(flashMethod === 'webusb' && webUSBStorageDevices.length > 0) || selectedStorage) && (
+            {((flashMethod === 'webusb' && currentStep >= 5) || (flashMethod === 'browser' && currentStep >= 4)) && 
+             (!(flashMethod === 'webusb' && webUSBStorageDevices.length > 0 && spiOperationMode === 'normal') || selectedStorage || spiOperationMode !== 'normal') && (
               <Card 
                 title={
                   <Space>
                     <CheckCircleOutlined style={{ color: colors.accent[500] }} />
-                    <span>Flash to Device</span>
+                    <span>
+                      {spiOperationMode === 'spi-clear' ? 'Clear SPI Flash' : 
+                       spiOperationMode === 'spi-bootloader' ? 'Write SPI Bootloader' : 
+                       'Flash to Device'}
+                    </span>
                   </Space>
                 }
                 style={{ backgroundColor: colors.background.primary }}
               >
                 {!isFlashing ? (
                   <div>
-                    <Alert
-                      message="Ready to Flash"
-                      description={
-                        <div>
-                          <div><strong>Build:</strong> {selectedBuild?.name}</div>
-                          <div><strong>Image:</strong> {selectedImageFile}</div>
-                          <div><strong>Method:</strong> {
-                            flashMethod === 'webusb' ? 'WebUSB (Rockchip Direct)' : 
-                            'Browser (Web Serial)'
-                          }</div>
-                          <div><strong>Device:</strong> {
-                            selectedDevice && 'id' in selectedDevice && 'chipInfo' in selectedDevice ? `Device ${selectedDevice.id} (${selectedDevice.chipInfo})` :
-                            selectedDevice && 'chipType' in selectedDevice ? `${selectedDevice.chipType} v${selectedDevice.version}` :
-                            selectedDevice && 'name' in selectedDevice ? selectedDevice.name :
-                            'No device selected'
-                          }</div>
-                          {selectedStorage && (
-                            <div><strong>Storage:</strong> {selectedStorage.toUpperCase()}</div>
-                          )}
-                        </div>
-                      }
-                      type="success"
-                      showIcon
-                      style={{ marginBottom: '16px' }}
-                    />
+                    {spiOperationMode === 'normal' && (
+                      <Alert
+                        message="Ready to Flash"
+                        description={
+                          <div>
+                            <div><strong>Build:</strong> {selectedBuild?.name}</div>
+                            <div><strong>Image:</strong> {selectedImageFile}</div>
+                            <div><strong>Method:</strong> {
+                              flashMethod === 'webusb' ? 'WebUSB (Rockchip Direct)' : 
+                              'Browser (Web Serial)'
+                            }</div>
+                            <div><strong>Device:</strong> {
+                              selectedDevice && 'id' in selectedDevice && 'chipInfo' in selectedDevice ? `Device ${selectedDevice.id} (${selectedDevice.chipInfo})` :
+                              selectedDevice && 'chipType' in selectedDevice ? `${selectedDevice.chipType} v${selectedDevice.version}` :
+                              selectedDevice && 'name' in selectedDevice ? selectedDevice.name :
+                              'No device selected'
+                            }</div>
+                            {selectedStorage && (
+                              <div><strong>Storage:</strong> {selectedStorage.toUpperCase()}</div>
+                            )}
+                          </div>
+                        }
+                        type="success"
+                        showIcon
+                        style={{ marginBottom: '16px' }}
+                      />
+                    )}
+
+                    {spiOperationMode === 'spi-clear' && (
+                      <Alert
+                        message="Ready to Clear SPI Flash"
+                        description={
+                          <div>
+                            <div><strong>Operation:</strong> Clear entire SPI NOR flash</div>
+                            <div><strong>Device:</strong> {
+                              selectedDevice && 'chipType' in selectedDevice ? `${selectedDevice.chipType} v${selectedDevice.version}` :
+                              'No device selected'
+                            }</div>
+                            <div style={{ marginTop: '8px', color: '#ff4d4f' }}>
+                              <ExclamationCircleOutlined style={{ marginRight: '4px' }} />
+                              <strong>Warning:</strong> This will completely erase the SPI flash chip!
+                            </div>
+                          </div>
+                        }
+                        type="warning"
+                        showIcon
+                        style={{ marginBottom: '16px' }}
+                      />
+                    )}
+
+                    {spiOperationMode === 'spi-bootloader' && (
+                      <Alert
+                        message="Ready to Write SPI Bootloader"
+                        description={
+                          <div>
+                            <div><strong>Operation:</strong> Write bootloader to SPI NOR flash</div>
+                            <div><strong>Bootloader Files:</strong> Auto-detected Rock 5B bootloader components</div>
+                            <div style={{ marginLeft: '20px', fontSize: '12px', color: colors.text.secondary }}>
+                              • rock5b_idbloader.img (~500KB)<br/>
+                              • rock5b_u-boot.itb (~500KB)
+                            </div>
+                            <div><strong>Device:</strong> {
+                              selectedDevice && 'chipType' in selectedDevice ? `${selectedDevice.chipType} v${selectedDevice.version}` :
+                              'No device selected'
+                            }</div>
+                            <div style={{ marginTop: '8px', color: '#1890ff' }}>
+                              <InfoCircleOutlined style={{ marginRight: '4px' }} />
+                              This will enable NVMe boot support on your device.
+                            </div>
+                          </div>
+                        }
+                        type="info"
+                        showIcon
+                        style={{ marginBottom: '16px' }}
+                      />
+                    )}
+
+                    {/* Reboot option for WebUSB */}
+                    {flashMethod === 'webusb' && (
+                      <div style={{ marginBottom: '16px' }}>
+                        <Space>
+                          <input
+                            type="checkbox"
+                            id="reboot-after-flash"
+                            checked={rebootAfterFlash}
+                            onChange={(e) => setRebootAfterFlash(e.target.checked)}
+                            style={{ marginRight: '8px' }}
+                          />
+                          <label htmlFor="reboot-after-flash" style={{ cursor: 'pointer' }}>
+                            Reboot device after operation completes
+                          </label>
+                          <Tooltip title="Automatically reboot the device after flashing/operation is complete">
+                            <InfoCircleOutlined style={{ color: colors.text.secondary }} />
+                          </Tooltip>
+                        </Space>
+                      </div>
+                    )}
                     
                     <div style={{ textAlign: 'center' }}>
-                      <Button 
-                        type="primary" 
-                        size="large"
-                        icon={<ThunderboltOutlined />}
-                        onClick={handleStartFlash}
-                        style={{ 
-                          height: '48px', 
-                          fontSize: '16px',
-                          backgroundColor: colors.accent[500],
-                          borderColor: colors.accent[500]
-                        }}
-                      >
-                        Start Flashing
-                      </Button>
+                      {spiOperationMode === 'normal' && (
+                        <Button 
+                          type="primary" 
+                          size="large"
+                          icon={<ThunderboltOutlined />}
+                          onClick={handleStartFlash}
+                          style={{ 
+                            height: '48px', 
+                            fontSize: '16px',
+                            backgroundColor: colors.accent[500],
+                            borderColor: colors.accent[500]
+                          }}
+                        >
+                          Start Flashing
+                        </Button>
+                      )}
+
+                      {spiOperationMode === 'spi-clear' && (
+                        <Button 
+                          type="primary" 
+                          size="large"
+                          danger
+                          icon={<ExclamationCircleOutlined />}
+                          onClick={handleSPIClear}
+                          style={{ 
+                            height: '48px', 
+                            fontSize: '16px'
+                          }}
+                        >
+                          Clear SPI Flash
+                        </Button>
+                      )}
+
+                      {spiOperationMode === 'spi-bootloader' && (
+                        <Button 
+                          type="primary" 
+                          size="large"
+                          icon={<DesktopOutlined />}
+                          onClick={handleSPIBootloaderWrite}
+                          style={{ 
+                            height: '48px', 
+                            fontSize: '16px',
+                            backgroundColor: colors.accent[500],
+                            borderColor: colors.accent[500]
+                          }}
+                        >
+                          Write SPI Bootloader
+                        </Button>
+                      )}
+
+                      {/* Manual reboot button */}
+                      {flashMethod === 'webusb' && selectedDevice && 'chipType' in selectedDevice && (
+                        <Button 
+                          style={{ marginLeft: '16px' }}
+                          icon={<ReloadOutlined />}
+                          onClick={handleDeviceReboot}
+                          disabled={isFlashing}
+                        >
+                          Reboot Device
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -935,8 +1232,14 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
                       <div>
                         <div style={{ marginBottom: '16px', textAlign: 'center' }}>
                           <Title level={4} style={{ color: colors.text.primary }}>
-                            {flashProgress.phase === 'completed' ? 'Flash Completed!' : 
-                             flashProgress.phase === 'failed' ? 'Flash Failed' : 'Flashing in Progress...'}
+                            {flashProgress.phase === 'completed' ? 
+                              (spiOperationMode === 'spi-clear' ? 'SPI Clear Completed!' :
+                               spiOperationMode === 'spi-bootloader' ? 'SPI Bootloader Written!' : 'Flash Completed!') : 
+                             flashProgress.phase === 'failed' ? 
+                              (spiOperationMode === 'spi-clear' ? 'SPI Clear Failed' :
+                               spiOperationMode === 'spi-bootloader' ? 'SPI Bootloader Failed' : 'Flash Failed') : 
+                              (spiOperationMode === 'spi-clear' ? 'Clearing SPI Flash...' :
+                               spiOperationMode === 'spi-bootloader' ? 'Writing SPI Bootloader...' : 'Flashing in Progress...')}
                           </Title>
                         </div>
                         
@@ -948,24 +1251,47 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
                           }
                           strokeColor={colors.accent[500]}
                           style={{ marginBottom: '16px' }}
+                          size="default"
+                          showInfo={true}
                         />
                         
-                        <Text style={{ color: colors.text.secondary }}>
-                          {flashProgress.message}
-                        </Text>
+                        <div style={{ 
+                          backgroundColor: colors.background.secondary, 
+                          padding: '12px', 
+                          borderRadius: '6px', 
+                          marginBottom: '16px' 
+                        }}>
+                          <Text style={{ color: colors.text.primary, fontWeight: 'bold' }}>
+                            Current Step: 
+                          </Text>
+                          <br />
+                          <Text style={{ color: colors.text.secondary }}>
+                            {flashProgress.message}
+                          </Text>
+                        </div>
                         
                         {flashProgress.bytesTransferred && flashProgress.totalBytes && (
-                          <div style={{ marginTop: '8px' }}>
-                            <Text type="secondary">
-                              {formatFileSize(flashProgress.bytesTransferred)} / {formatFileSize(flashProgress.totalBytes)}
-                            </Text>
+                          <div style={{ marginBottom: '16px' }}>
+                            <Row justify="space-between">
+                              <Col>
+                                <Text type="secondary">
+                                  Data transferred: {formatFileSize(flashProgress.bytesTransferred)} / {formatFileSize(flashProgress.totalBytes)}
+                                </Text>
+                              </Col>
+                              <Col>
+                                <Text type="secondary">
+                                  {Math.round((flashProgress.bytesTransferred / flashProgress.totalBytes) * 100)}% complete
+                                </Text>
+                              </Col>
+                            </Row>
                           </div>
                         )}
 
                         {(flashProgress.phase === 'completed' || flashProgress.phase === 'failed') && (
                           <div style={{ textAlign: 'center', marginTop: '24px' }}>
                             <Button onClick={handleReset} type="primary">
-                              Flash Another Image
+                              {spiOperationMode === 'spi-clear' ? 'Perform Another Operation' :
+                               spiOperationMode === 'spi-bootloader' ? 'Flash Another Bootloader' : 'Flash Another Image'}
                             </Button>
                           </div>
                         )}
@@ -1022,13 +1348,13 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <Text strong>Rockchip Devices</Text>
-                    {isWebUSBSupported() && (
+                    {WebUSBRockchipFlasher.isSupported() && (
                       <Button 
                         size="small" 
                         icon={<UsbOutlined />} 
                         onClick={async () => {
                           try {
-                            await webUSBRockchipFlasher.requestDevice();
+                            await WebUSBRockchipFlasher.requestDevice();
                             await fetchRockchipDevices();
                           } catch (error) {
                             console.error('Failed to request Rockchip device:', error);
@@ -1039,7 +1365,7 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
                       </Button>
                     )}
                   </div>
-                  {!isWebUSBSupported() ? (
+                  {!WebUSBRockchipFlasher.isSupported() ? (
                     <Alert 
                       message="WebUSB not supported in this browser" 
                       type="warning"
@@ -1059,6 +1385,44 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
 
             {/* Instructions */}
             <FlashInstructions />
+
+            {/* SPI Operations Info */}
+            {flashMethod === 'webusb' && (
+              <Card 
+                title="SPI Flash Operations" 
+                style={{ 
+                  marginBottom: '16px',
+                  backgroundColor: colors.background.primary 
+                }}
+              >
+                <div style={{ fontSize: '14px' }}>
+                  <div style={{ marginBottom: '12px' }}>
+                    <Text strong style={{ color: colors.accent[500] }}>Normal Flash:</Text>
+                    <br />
+                    <Text type="secondary">Flash full OS images to eMMC, SD, or NVMe storage.</Text>
+                  </div>
+                  
+                  <div style={{ marginBottom: '12px' }}>
+                    <Text strong style={{ color: '#ff7875' }}>SPI Clear:</Text>
+                    <br />
+                    <Text type="secondary">Completely erase SPI flash to remove old bootloaders.</Text>
+                  </div>
+                  
+                  <div style={{ marginBottom: '12px' }}>
+                    <Text strong style={{ color: '#52c41a' }}>SPI Bootloader:</Text>
+                    <br />
+                    <Text type="secondary">Write bootloader to SPI flash for NVMe boot support.</Text>
+                  </div>
+
+                  <Alert
+                    message="Why SPI Flash?"
+                    description="SPI flash stores the bootloader that enables your device to boot from NVMe storage. Update it when switching storage types or fixing boot issues."
+                    type="info"
+                    showIcon
+                  />
+                </div>
+              </Card>
+            )}
 
             {/* Debug Information */}
             <SerialDebugInfo />
