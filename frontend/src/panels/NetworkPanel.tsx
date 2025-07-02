@@ -177,7 +177,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({
       filtered = filtered.filter(n =>
         n.name.toLowerCase().includes(term) ||
         n.description?.toLowerCase().includes(term) ||
-        n.tags?.some(tag => tag.toLowerCase().includes(term)) ||
+        n.tags?.some((tag: string) => tag.toLowerCase().includes(term)) ||
         n.hardware?.manufacturer?.toLowerCase().includes(term) ||
         n.hardware?.model?.toLowerCase().includes(term)
       );
@@ -302,7 +302,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({
                 <NodeCard
                   key={node.id}
                   node={node}
-                  onUpdate={(updates) => handleNodeUpdate(node.id, updates)}
+                  onUpdate={(updates: Partial<NetworkNode>) => handleNodeUpdate(node.id, updates)}
                   onBuild={() => onBuildNode(node.id)}
                   onFlash={() => onFlashNode(node.id)}
                   onDelete={() => onDeleteNode(node.id)}
@@ -356,7 +356,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({
       {showNetworkConfig && (
         <NetworkConfigurationModal
           onClose={() => setShowNetworkConfig(false)}
-          onSave={(config) => {
+          onSave={(config: any) => {
             // Handle network configuration save
             console.log('Network config:', config);
             setShowNetworkConfig(false);
@@ -381,7 +381,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({
           <div className="p-4 overflow-auto">
             <NodeCard
               node={selectedNode}
-              onUpdate={(updates) => handleNodeUpdate(selectedNode.id, updates)}
+              onUpdate={(updates: Partial<NetworkNode>) => handleNodeUpdate(selectedNode.id, updates)}
               onBuild={() => onBuildNode(selectedNode.id)}
               onFlash={() => onFlashNode(selectedNode.id)}
               onDelete={() => onDeleteNode(selectedNode.id)}
