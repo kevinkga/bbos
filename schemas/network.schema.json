@@ -1,0 +1,440 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://bbos.dev/schemas/network.schema.json",
+  "title": "NetworkInfrastructure",
+  "description": "Comprehensive network infrastructure definition for managing home and enterprise networks with SBC devices",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique network identifier"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "Network name (e.g., 'Home Lab', 'Office Network')"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Network description and purpose"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["home", "enterprise", "datacenter", "development", "production", "hybrid"],
+      "description": "Network type classification"
+    },
+    "owner": {
+      "type": "object",
+      "properties": {
+        "userId": {"type": "string", "format": "uuid"},
+        "organization": {"type": "string"},
+        "contact": {
+          "type": "object",
+          "properties": {
+            "email": {"type": "string", "format": "email"},
+            "phone": {"type": "string"}
+          }
+        }
+      },
+      "required": ["userId"]
+    },
+    "topology": {
+      "type": "object",
+      "properties": {
+        "layout": {
+          "type": "string",
+          "enum": ["star", "mesh", "tree", "hybrid", "ring"],
+          "description": "Network topology type"
+        },
+        "subnets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {"type": "string", "format": "uuid"},
+              "name": {"type": "string"},
+              "cidr": {"type": "string", "pattern": "^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}/\\d{1,2}$"},
+              "gateway": {"type": "string", "format": "ipv4"},
+              "vlan": {"type": "integer", "minimum": 1, "maximum": 4094},
+              "purpose": {
+                "type": "string",
+                "enum": ["management", "production", "dmz", "guest", "iot", "storage", "backup"]
+              },
+              "security": {
+                "type": "string",
+                "enum": ["isolated", "controlled", "open"],
+                "default": "controlled"
+              },
+              "dhcp": {
+                "type": "object",
+                "properties": {
+                  "enabled": {"type": "boolean", "default": true},
+                  "range": {
+                    "type": "object",
+                    "properties": {
+                      "start": {"type": "string", "format": "ipv4"},
+                      "end": {"type": "string", "format": "ipv4"}
+                    },
+                    "required": ["start", "end"]
+                  },
+                  "reservations": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "ip": {"type": "string", "format": "ipv4"},
+                        "mac": {"type": "string", "pattern": "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$"},
+                        "hostname": {"type": "string"}
+                      },
+                      "required": ["ip", "mac"]
+                    }
+                  }
+                }
+              }
+            },
+            "required": ["id", "name", "cidr", "gateway"]
+          }
+        },
+        "zones": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {"type": "string", "format": "uuid"},
+              "name": {"type": "string"},
+              "description": {"type": "string"},
+              "securityLevel": {
+                "type": "string",
+                "enum": ["public", "internal", "restricted", "confidential"],
+                "default": "internal"
+              },
+              "nodes": {
+                "type": "array",
+                "items": {"type": "string", "format": "uuid"},
+                "description": "Node IDs in this zone"
+              }
+            },
+            "required": ["id", "name"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "infrastructure": {
+      "type": "object",
+      "properties": {
+        "internetConnection": {
+          "type": "object",
+          "properties": {
+            "provider": {"type": "string"},
+            "type": {
+              "type": "string",
+              "enum": ["fiber", "cable", "dsl", "satellite", "cellular", "other"]
+            },
+            "bandwidth": {
+              "type": "object",
+              "properties": {
+                "download": {"type": "string", "description": "e.g., '1000 Mbps'"},
+                "upload": {"type": "string", "description": "e.g., '100 Mbps'"}
+              }
+            },
+            "staticIp": {"type": "boolean", "default": false},
+            "ipv6": {"type": "boolean", "default": false}
+          }
+        },
+        "primaryRouter": {
+          "type": "object",
+          "properties": {
+            "nodeId": {"type": "string", "format": "uuid"},
+            "make": {"type": "string"},
+            "model": {"type": "string"},
+            "firmwareVersion": {"type": "string"},
+            "managementInterface": {"type": "string", "format": "uri"}
+          }
+        },
+        "switches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "nodeId": {"type": "string", "format": "uuid"},
+              "ports": {"type": "integer", "minimum": 1},
+              "managed": {"type": "boolean", "default": false},
+              "poe": {"type": "boolean", "default": false},
+              "stackable": {"type": "boolean", "default": false}
+            },
+            "required": ["nodeId", "ports"]
+          }
+        },
+        "accessPoints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "nodeId": {"type": "string", "format": "uuid"},
+              "ssids": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {"type": "string"},
+                    "security": {"type": "string", "enum": ["open", "wpa2", "wpa3", "enterprise"]},
+                    "vlan": {"type": "integer", "minimum": 1, "maximum": 4094},
+                    "hidden": {"type": "boolean", "default": false}
+                  },
+                  "required": ["name", "security"]
+                }
+              },
+              "standards": {
+                "type": "array",
+                "items": {"type": "string", "enum": ["802.11a", "802.11b", "802.11g", "802.11n", "802.11ac", "802.11ax"]}
+              }
+            },
+            "required": ["nodeId"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "security": {
+      "type": "object",
+      "properties": {
+        "firewall": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": true},
+            "type": {"type": "string", "enum": ["software", "hardware", "cloud", "hybrid"]},
+            "vendor": {"type": "string"},
+            "rules": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {"type": "string"},
+                  "name": {"type": "string"},
+                  "action": {"type": "string", "enum": ["allow", "deny", "log"]},
+                  "source": {"type": "string"},
+                  "destination": {"type": "string"},
+                  "port": {"type": ["integer", "string"]},
+                  "protocol": {"type": "string", "enum": ["tcp", "udp", "icmp", "any"]},
+                  "enabled": {"type": "boolean", "default": true}
+                },
+                "required": ["id", "name", "action"]
+              }
+            }
+          }
+        },
+        "vpn": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": false},
+            "type": {"type": "string", "enum": ["wireguard", "openvpn", "ipsec", "commercial"]},
+            "serverNodeId": {"type": "string", "format": "uuid"},
+            "clients": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {"type": "string"},
+                  "publicKey": {"type": "string"},
+                  "allowedIPs": {"type": "array", "items": {"type": "string"}}
+                },
+                "required": ["name"]
+              }
+            }
+          }
+        },
+        "monitoring": {
+          "type": "object",
+          "properties": {
+            "intrusion_detection": {"type": "boolean", "default": false},
+            "network_scanning": {"type": "boolean", "default": true},
+            "vulnerability_assessment": {"type": "boolean", "default": false},
+            "log_aggregation": {"type": "boolean", "default": false}
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "services": {
+      "type": "object",
+      "properties": {
+        "dns": {
+          "type": "object",
+          "properties": {
+            "primary": {"type": "string", "format": "ipv4"},
+            "secondary": {"type": "string", "format": "ipv4"},
+            "local_domain": {"type": "string"},
+            "ad_blocking": {"type": "boolean", "default": false},
+            "custom_records": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "hostname": {"type": "string"},
+                  "ip": {"type": "string", "format": "ipv4"},
+                  "type": {"type": "string", "enum": ["A", "AAAA", "CNAME", "PTR"]}
+                },
+                "required": ["hostname", "ip", "type"]
+              }
+            }
+          }
+        },
+        "ntp": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": true},
+            "servers": {
+              "type": "array",
+              "items": {"type": "string"},
+              "default": ["pool.ntp.org"]
+            },
+            "local_server": {"type": "string", "format": "ipv4"}
+          }
+        },
+        "storage": {
+          "type": "object",
+          "properties": {
+            "nas_nodes": {
+              "type": "array",
+              "items": {"type": "string", "format": "uuid"},
+              "description": "Node IDs providing network storage"
+            },
+            "backup_strategy": {
+              "type": "string",
+              "enum": ["local", "cloud", "hybrid", "none"],
+              "default": "none"
+            },
+            "file_sharing": {
+              "type": "object",
+              "properties": {
+                "smb": {"type": "boolean", "default": false},
+                "nfs": {"type": "boolean", "default": false},
+                "ftp": {"type": "boolean", "default": false}
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "monitoring": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean", "default": true},
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["prometheus", "grafana", "nagios", "zabbix", "prtg", "snmp", "custom"]
+          }
+        },
+        "metrics": {
+          "type": "object",
+          "properties": {
+            "bandwidth_monitoring": {"type": "boolean", "default": true},
+            "latency_monitoring": {"type": "boolean", "default": true},
+            "device_health": {"type": "boolean", "default": true},
+            "security_events": {"type": "boolean", "default": false}
+          }
+        },
+        "alerting": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": false},
+            "thresholds": {
+              "type": "object",
+              "properties": {
+                "bandwidth_utilization": {"type": "number", "minimum": 0, "maximum": 100, "default": 80},
+                "latency_ms": {"type": "number", "minimum": 0, "default": 100},
+                "packet_loss_percent": {"type": "number", "minimum": 0, "maximum": 100, "default": 5}
+              }
+            },
+            "notifications": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {"type": "string", "enum": ["email", "sms", "webhook", "slack", "discord"]},
+                  "address": {"type": "string"},
+                  "severity": {"type": "string", "enum": ["info", "warning", "error", "critical"]}
+                },
+                "required": ["type", "address"]
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "nodes": {
+      "type": "array",
+      "items": {"$ref": "https://bbos.dev/schemas/network-node.schema.json"},
+      "description": "All network nodes in this infrastructure"
+    },
+    "documentation": {
+      "type": "object",
+      "properties": {
+        "network_diagram": {"type": "string", "format": "uri"},
+        "configuration_notes": {"type": "string"},
+        "maintenance_log": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "date": {"type": "string", "format": "date-time"},
+              "description": {"type": "string"},
+              "performed_by": {"type": "string"},
+              "duration_minutes": {"type": "integer", "minimum": 0}
+            },
+            "required": ["date", "description"]
+          }
+        },
+        "change_log": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "date": {"type": "string", "format": "date-time"},
+              "change": {"type": "string"},
+              "reason": {"type": "string"},
+              "performed_by": {"type": "string"},
+              "rollback_plan": {"type": "string"}
+            },
+            "required": ["date", "change"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "tags": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Custom tags for organization and filtering"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Additional metadata specific to the network type"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1,
+      "description": "Schema version for evolution"
+    }
+  },
+  "required": ["id", "name", "type", "owner", "createdAt", "version"],
+  "additionalProperties": false
+} 

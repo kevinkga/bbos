@@ -11,5 +11,132 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <!-- WebUSB Connection Test Script for Debugging -->
+    <script>
+      // WebUSB Device Connection Test
+      console.log('🔍 Testing WebUSB Rockchip Device Connection...');
+
+      // Check WebUSB support
+      if (!('usb' in navigator)) {
+        console.error('❌ WebUSB not supported in this browser');
+      } else {
+        console.log('✅ WebUSB API available');
+      }
+
+      // Test device detection
+      async function testDeviceDetection() {
+        try {
+          console.log('📋 Testing device detection...');
+          
+          // Check for existing devices
+          const devices = await navigator.usb.getDevices();
+          console.log(`📱 Found ${devices.length} USB devices with previous permission`);
+          
+          // Filter Rockchip devices
+          const rockchipDevices = devices.filter(device => 
+            device.vendorId === 0x2207 // Rockchip vendor ID
+          );
+          
+          console.log(`🔍 Found ${rockchipDevices.length} Rockchip devices:`);
+          rockchipDevices.forEach((device, index) => {
+            console.log(`  Device ${index + 1}:`);
+            console.log(`    Vendor ID: 0x${device.vendorId.toString(16)}`);
+            console.log(`    Product ID: 0x${device.productId.toString(16)}`);
+            console.log(`    Version: ${device.deviceVersionMajor}.${device.deviceVersionMinor}`);
+            console.log(`    Configurations: ${device.configurations?.length || 'N/A'}`);
+          });
+          
+          if (rockchipDevices.length === 0) {
+            console.log('💡 No Rockchip devices with permission found. User needs to click "Connect Device" to grant access.');
+          }
+          
+          return rockchipDevices;
+          
+        } catch (error) {
+          console.error('❌ Device detection failed:', error);
+          return [];
+        }
+      }
+
+      // Test device connection if devices are available
+      async function testDeviceConnection(device) {
+        try {
+          console.log('🔌 Testing device connection...');
+          
+          // Open device
+          await device.open();
+          console.log('✅ Device opened successfully');
+          
+          // Select configuration
+          if (device.configuration === null) {
+            await device.selectConfiguration(1);
+            console.log('✅ Configuration selected');
+          }
+          
+          // Find and claim interface
+          const config = device.configurations[0];
+          const interface = config.interfaces[0];
+          
+          await device.claimInterface(interface.interfaceNumber);
+          console.log(`✅ Interface ${interface.interfaceNumber} claimed`);
+          
+          // Find bulk endpoints
+          const endpoints = interface.endpoints || interface.alternates?.[0]?.endpoints || [];
+          const bulkOut = endpoints.find(ep => ep.direction === 'out' && ep.type === 'bulk');
+          const bulkIn = endpoints.find(ep => ep.direction === 'in' && ep.type === 'bulk');
+          
+          console.log('📋 Endpoints found:', {
+            bulkOut: bulkOut?.endpointNumber,
+            bulkIn: bulkIn?.endpointNumber
+          });
+          
+          // Test simple communication
+          if (bulkOut) {
+            console.log('🧪 Testing basic communication...');
+            const testCmd = new Uint8Array([0x00, 0x00, 0x00, 0x00, 0x00, 0x00]); // TEST_UNIT_READY
+            
+            const result = await device.transferOut(bulkOut.endpointNumber, testCmd);
+            console.log('📤 Test command result:', result.status, `(${result.bytesWritten} bytes)`);
+          }
+          
+          // Clean up
+          await device.releaseInterface(interface.interfaceNumber);
+          await device.close();
+          console.log('✅ Device connection test completed successfully');
+          
+          return true;
+          
+        } catch (error) {
+          console.error('❌ Device connection test failed:', error);
+          return false;
+        }
+      }
+
+      // Main test function
+      async function runWebUSBTests() {
+        console.log('🚀 Starting WebUSB connection tests...');
+        
+        const devices = await testDeviceDetection();
+        
+        if (devices.length > 0) {
+          console.log('🔌 Testing connection to first device...');
+          const success = await testDeviceConnection(devices[0]);
+          
+          if (success) {
+            console.log('🎉 All tests passed! WebUSB connection is working correctly.');
+            console.log('💡 The SPI operations should work once user grants device permission.');
+          } else {
+            console.log('⚠️ Connection test failed. Device may need to be in maskrom mode.');
+          }
+        } else {
+          console.log('💡 Next step: Click "Connect Device" in the UI to grant WebUSB access.');
+        }
+      }
+
+      // Export for console use
+      window.testWebUSB = runWebUSBTests;
+
+      console.log('📝 WebUSB test script loaded. Run "testWebUSB()" in console to test connection.');
+    </script>
   </body>
 </html> 

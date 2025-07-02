@@ -1,0 +1,408 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://bbos.dev/schemas/network-node.schema.json",
+  "title": "NetworkNode",
+  "description": "Network-centric device node based on Armbian configuration with additional networking and infrastructure metadata",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique network node identifier"
+    },
+    "networkId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Network/infrastructure ID this node belongs to"
+    },
+    "userId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Owner user ID"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "Human-readable node name"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Node description and purpose"
+    },
+    "nodeType": {
+      "type": "string",
+      "enum": ["sbc", "workstation", "server", "appliance", "iot", "router", "switch", "nas", "gateway"],
+      "description": "Type of network node"
+    },
+    "deviceCategory": {
+      "type": "string",
+      "enum": ["armbian_supported", "generic_linux", "proprietary", "embedded", "virtual"],
+      "description": "Device category for configuration management"
+    },
+    "location": {
+      "type": "object",
+      "properties": {
+        "room": {"type": "string", "description": "Physical room/location"},
+        "rack": {"type": "string", "description": "Rack identifier if applicable"},
+        "position": {"type": "string", "description": "Position within rack/shelf"},
+        "coordinates": {
+          "type": "object",
+          "properties": {
+            "x": {"type": "number"},
+            "y": {"type": "number"},
+            "z": {"type": "number"}
+          },
+          "description": "3D coordinates for network topology visualization"
+        },
+        "building": {"type": "string"},
+        "floor": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "hardware": {
+      "type": "object",
+      "properties": {
+        "manufacturer": {"type": "string", "description": "Hardware manufacturer"},
+        "model": {"type": "string", "description": "Device model"},
+        "serial": {"type": "string", "description": "Serial number"},
+        "macAddress": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$"},
+          "description": "MAC addresses of network interfaces"
+        },
+        "specs": {
+          "type": "object",
+          "properties": {
+            "cpu": {"type": "string"},
+            "memory": {"type": "string"},
+            "storage": {"type": "string"},
+            "networkPorts": {"type": "integer", "minimum": 0},
+            "usbPorts": {"type": "integer", "minimum": 0},
+            "gpioAvailable": {"type": "boolean", "default": false},
+            "powerConsumption": {"type": "string", "description": "Power consumption (e.g., '15W', '5V/3A')"}
+          },
+          "additionalProperties": false
+        },
+        "expansionCards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "slot": {"type": "string"},
+              "type": {"type": "string"},
+              "description": {"type": "string"}
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "networkConfig": {
+      "type": "object",
+      "properties": {
+        "primaryIp": {"type": "string", "format": "ipv4", "description": "Primary IP address"},
+        "fqdn": {"type": "string", "description": "Fully qualified domain name"},
+        "interfaces": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string", "description": "Interface name (e.g., eth0, wlan0)"},
+              "type": {"type": "string", "enum": ["ethernet", "wifi", "bluetooth", "usb", "bridge", "bond", "vlan"]},
+              "ip": {"type": "string", "format": "ipv4"},
+              "ipv6": {"type": "string", "format": "ipv6"},
+              "subnet": {"type": "string", "description": "CIDR notation (e.g., 24, 16)"},
+              "vlan": {"type": "integer", "minimum": 1, "maximum": 4094},
+              "macAddress": {"type": "string", "pattern": "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$"},
+              "status": {"type": "string", "enum": ["up", "down", "unknown"]},
+              "speed": {"type": "string", "description": "Link speed (e.g., '1Gbps', '100Mbps')"},
+              "duplex": {"type": "string", "enum": ["full", "half", "unknown"]},
+              "mtu": {"type": "integer", "minimum": 68, "maximum": 9000}
+            },
+            "required": ["name", "type"]
+          }
+        },
+        "routing": {
+          "type": "object",
+          "properties": {
+            "defaultGateway": {"type": "string", "format": "ipv4"},
+            "staticRoutes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "destination": {"type": "string"},
+                  "gateway": {"type": "string", "format": "ipv4"},
+                  "interface": {"type": "string"},
+                  "metric": {"type": "integer"}
+                },
+                "required": ["destination", "gateway"]
+              }
+            }
+          }
+        },
+        "dns": {
+          "type": "object",
+          "properties": {
+            "servers": {
+              "type": "array",
+              "items": {"type": "string", "format": "ipv4"}
+            },
+            "searchDomains": {
+              "type": "array",
+              "items": {"type": "string"}
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "services": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": ["compute", "storage", "network", "monitoring", "development", "production", "staging", "testing"],
+          "description": "Primary role of this node"
+        },
+        "applications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "version": {"type": "string"},
+              "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+              "protocol": {"type": "string", "enum": ["tcp", "udp", "both"]},
+              "status": {"type": "string", "enum": ["running", "stopped", "error", "unknown"]},
+              "autoStart": {"type": "boolean", "default": true},
+              "healthCheck": {
+                "type": "object",
+                "properties": {
+                  "enabled": {"type": "boolean", "default": false},
+                  "url": {"type": "string", "format": "uri"},
+                  "interval": {"type": "integer", "minimum": 5, "default": 60},
+                  "timeout": {"type": "integer", "minimum": 1, "default": 10}
+                }
+              }
+            },
+            "required": ["name", "port"]
+          }
+        },
+        "containers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "image": {"type": "string"},
+              "ports": {
+                "type": "array",
+                "items": {"type": "string"}
+              },
+              "volumes": {
+                "type": "array",
+                "items": {"type": "string"}
+              },
+              "environment": {
+                "type": "object",
+                "additionalProperties": {"type": "string"}
+              },
+              "restart": {"type": "string", "enum": ["no", "always", "on-failure", "unless-stopped"], "default": "unless-stopped"}
+            },
+            "required": ["name", "image"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "monitoring": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean", "default": true},
+        "agents": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["prometheus", "grafana", "snmp", "zabbix", "nagios", "custom"]
+          }
+        },
+        "metrics": {
+          "type": "object",
+          "properties": {
+            "system": {"type": "boolean", "default": true},
+            "network": {"type": "boolean", "default": true},
+            "storage": {"type": "boolean", "default": true},
+            "applications": {"type": "boolean", "default": false}
+          }
+        },
+        "alerting": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": false},
+            "thresholds": {
+              "type": "object",
+              "properties": {
+                "cpuUsage": {"type": "number", "minimum": 0, "maximum": 100, "default": 80},
+                "memoryUsage": {"type": "number", "minimum": 0, "maximum": 100, "default": 85},
+                "diskUsage": {"type": "number", "minimum": 0, "maximum": 100, "default": 90},
+                "networkLatency": {"type": "number", "minimum": 0, "default": 100}
+              }
+            },
+            "contacts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {"type": "string", "enum": ["email", "sms", "webhook", "slack"]},
+                  "address": {"type": "string"}
+                },
+                "required": ["type", "address"]
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "deployment": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["planned", "building", "deploying", "deployed", "error", "maintenance", "decommissioned"],
+          "default": "planned"
+        },
+        "lastSeen": {"type": "string", "format": "date-time"},
+        "uptime": {"type": "number", "description": "Uptime in seconds"},
+        "buildHistory": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "buildId": {"type": "string", "format": "uuid"},
+              "version": {"type": "string"},
+              "timestamp": {"type": "string", "format": "date-time"},
+              "status": {"type": "string", "enum": ["success", "failed", "pending"]},
+              "deploymentMethod": {"type": "string", "enum": ["webusb", "ssh", "physical", "pxe", "sd_card"]}
+            },
+            "required": ["buildId", "timestamp", "status"]
+          }
+        },
+        "maintenanceWindows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "start": {"type": "string", "format": "date-time"},
+              "end": {"type": "string", "format": "date-time"},
+              "description": {"type": "string"},
+              "recurring": {"type": "boolean", "default": false}
+            },
+            "required": ["start", "end"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "security": {
+      "type": "object",
+      "properties": {
+        "accessLevel": {
+          "type": "string",
+          "enum": ["public", "internal", "restricted", "confidential"],
+          "default": "internal"
+        },
+        "compliance": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["sox", "pci", "hipaa", "gdpr", "iso27001"]
+          }
+        },
+        "certificates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {"type": "string", "enum": ["ssl", "ssh", "vpn", "client"]},
+              "issuer": {"type": "string"},
+              "subject": {"type": "string"},
+              "expiryDate": {"type": "string", "format": "date"},
+              "fingerprint": {"type": "string"}
+            },
+            "required": ["type", "subject"]
+          }
+        },
+        "vulnerabilities": {
+          "type": "object",
+          "properties": {
+            "lastScan": {"type": "string", "format": "date-time"},
+            "critical": {"type": "integer", "minimum": 0, "default": 0},
+            "high": {"type": "integer", "minimum": 0, "default": 0},
+            "medium": {"type": "integer", "minimum": 0, "default": 0},
+            "low": {"type": "integer", "minimum": 0, "default": 0}
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "dependencies": {
+      "type": "object",
+      "properties": {
+        "upstream": {
+          "type": "array",
+          "items": {"type": "string", "format": "uuid"},
+          "description": "Nodes this node depends on"
+        },
+        "downstream": {
+          "type": "array",
+          "items": {"type": "string", "format": "uuid"},
+          "description": "Nodes that depend on this node"
+        },
+        "criticalPath": {"type": "boolean", "default": false, "description": "Whether this node is on the critical path"}
+      },
+      "additionalProperties": false
+    },
+    "armbianConfig": {
+      "$ref": "https://bbos.dev/schemas/armbian-configuration.schema.json",
+      "description": "Full Armbian configuration (for SBC nodes)"
+    },
+    "tags": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Custom tags for organization and filtering"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Additional metadata specific to the node type or use case"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1,
+      "description": "Schema version for evolution"
+    }
+  },
+  "required": ["id", "networkId", "userId", "name", "nodeType", "deviceCategory", "createdAt", "version"],
+  "additionalProperties": false,
+  "if": {
+    "properties": {
+      "deviceCategory": {"const": "armbian_supported"}
+    }
+  },
+  "then": {
+    "required": ["armbianConfig"]
+  }
+} 

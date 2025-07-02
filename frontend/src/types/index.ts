@@ -410,6 +410,9 @@ export interface DeviceErrorEvent {
   timestamp: string
 }
 
+// Network types
+export * from './network';
+
 // Export all types
 export * from './flexlayout'
 export * from './rjsf' 

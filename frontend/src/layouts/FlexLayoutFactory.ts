@@ -243,6 +243,14 @@ export class FlexLayoutFactory {
               enableClose: false,
               icon: 'git-branch',
             },
+            {
+              type: 'tab',
+              id: 'network',
+              name: 'Network',
+              component: 'NetworkPanel',
+              enableClose: false,
+              icon: 'network',
+            },
           ],
         },
         {

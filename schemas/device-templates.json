@@ -1,0 +1,590 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://bbos.dev/schemas/device-templates.json",
+  "title": "SBC Device Templates",
+  "description": "Comprehensive templates for common Single Board Computers with verified Armbian configurations",
+  "type": "object",
+  "properties": {
+    "rk3588_rock5b": {
+      "title": "Radxa Rock 5B (RK3588)",
+      "description": "High-performance RK3588 SBC with 4-32GB RAM, excellent for compute workloads",
+      "type": "object",
+      "properties": {
+        "nodeType": {"const": "sbc"},
+        "deviceCategory": {"const": "armbian_supported"},
+        "hardware": {
+          "type": "object",
+          "properties": {
+            "manufacturer": {"const": "Radxa"},
+            "model": {"const": "Rock 5B"},
+            "specs": {
+              "type": "object",
+              "properties": {
+                "cpu": {"const": "Rockchip RK3588 (4x Cortex-A76 @ 2.4GHz + 4x Cortex-A55 @ 1.8GHz)"},
+                "memory": {"enum": ["4GB LPDDR4x", "8GB LPDDR4x", "16GB LPDDR4x", "32GB LPDDR4x"]},
+                "storage": {"const": "eMMC socket, microSD, M.2 NVMe"},
+                "networkPorts": {"const": 1},
+                "usbPorts": {"const": 4},
+                "gpioAvailable": {"const": true},
+                "powerConsumption": {"const": "5V/4A (20W max)"}
+              }
+            }
+          }
+        },
+        "armbianConfig": {
+          "type": "object",
+          "properties": {
+            "board": {
+              "type": "object",
+              "properties": {
+                "family": {"const": "rk35xx"},
+                "name": {"const": "rock-5b"},
+                "architecture": {"const": "arm64"},
+                "variant": {"enum": ["standard", "plus"]}
+              },
+              "required": ["family", "name", "architecture"]
+            },
+            "distribution": {
+              "type": "object",
+              "properties": {
+                "release": {"enum": ["bookworm", "noble", "jammy"]},
+                "type": {"enum": ["minimal", "server", "desktop"]},
+                "desktop": {"enum": ["gnome", "kde", "xfce"]}
+              },
+              "required": ["release", "type"]
+            },
+            "bootEnvironment": {
+              "type": "object",
+              "properties": {
+                "bootloader": {"const": "u-boot"},
+                "kernelParams": {
+                  "type": "object",
+                  "properties": {
+                    "console": {"const": ["ttyS2,1500000n8"]},
+                    "rootwait": {"const": true},
+                    "earlycon": {"const": true},
+                    "splash": {"const": false},
+                    "loglevel": {"const": 7}
+                  }
+                },
+                "overlays": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "array",
+                      "items": {
+                        "enum": [
+                          "rk3588-i2c1-m2",
+                          "rk3588-spi4-m2",
+                          "rk3588-uart7-m2",
+                          "rk3588-uart9-m2",
+                          "rk3588-pwm14-m2",
+                          "rk3588-pwm15-m2",
+                          "rk3588-can1-m1"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "storage": {
+              "type": "object",
+              "properties": {
+                "filesystem": {"enum": ["ext4", "btrfs"]},
+                "swapSize": {"const": 1024}
+              }
+            },
+            "network": {
+              "type": "object",
+              "properties": {
+                "hostname": {"pattern": "^rock5b-[a-z0-9-]+$"},
+                "wifi": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {"const": true},
+                    "country": {"pattern": "^[A-Z]{2}$"}
+                  }
+                },
+                "ethernet": {
+                  "type": "object",
+                  "properties": {
+                    "dhcp": {"const": true},
+                    "mtu": {"const": 1500}
+                  }
+                }
+              }
+            }
+          }
+        },
+        "recommendedUse": {
+          "type": "array",
+          "items": {
+            "enum": ["ai_inference", "media_server", "development", "container_host", "nas", "compute_node"]
+          }
+        },
+        "knownIssues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "Requires specific HDMI cable for 4K output",
+            "GPU acceleration requires mesa drivers",
+            "Some USB-C hubs may cause power issues"
+          ]
+        }
+      }
+    },
+    "rk3566_rock3w": {
+      "title": "Radxa Rock 3 Model W (RK3566)",
+      "description": "Compact RK3566 SBC with WiFi 6, ideal for IoT and edge computing",
+      "type": "object",
+      "properties": {
+        "nodeType": {"const": "sbc"},
+        "deviceCategory": {"const": "armbian_supported"},
+        "hardware": {
+          "type": "object",
+          "properties": {
+            "manufacturer": {"const": "Radxa"},
+            "model": {"const": "Rock 3 Model W"},
+            "specs": {
+              "type": "object",
+              "properties": {
+                "cpu": {"const": "Rockchip RK3566 (4x Cortex-A55 @ 1.8GHz)"},
+                "memory": {"enum": ["2GB LPDDR4", "4GB LPDDR4", "8GB LPDDR4"]},
+                "storage": {"const": "microSD, eMMC module"},
+                "networkPorts": {"const": 1},
+                "usbPorts": {"const": 3},
+                "gpioAvailable": {"const": true},
+                "powerConsumption": {"const": "5V/3A (15W max)"}
+              }
+            }
+          }
+        },
+        "armbianConfig": {
+          "type": "object",
+          "properties": {
+            "board": {
+              "type": "object",
+              "properties": {
+                "family": {"const": "rockchip64"},
+                "name": {"const": "rock-3w"},
+                "architecture": {"const": "arm64"}
+              },
+              "required": ["family", "name", "architecture"]
+            },
+            "distribution": {
+              "type": "object",
+              "properties": {
+                "release": {"enum": ["bookworm", "jammy"]},
+                "type": {"enum": ["minimal", "server"]},
+                "desktop": {"enum": ["xfce", "gnome"]}
+              },
+              "required": ["release", "type"]
+            },
+            "bootEnvironment": {
+              "type": "object",
+              "properties": {
+                "bootloader": {"const": "u-boot"},
+                "kernelParams": {
+                  "type": "object",
+                  "properties": {
+                    "console": {"const": ["ttyS2,1500000n8"]},
+                    "rootwait": {"const": true},
+                    "splash": {"const": false}
+                  }
+                },
+                "overlays": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "array",
+                      "items": {
+                        "enum": [
+                          "rk3566-i2c3-m0",
+                          "rk3566-spi3-m0",
+                          "rk3566-uart3-m0",
+                          "rk3566-pwm8-m0",
+                          "rk3566-can1-m0"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "storage": {
+              "type": "object",
+              "properties": {
+                "filesystem": {"const": "ext4"},
+                "swapSize": {"const": 512}
+              }
+            },
+            "network": {
+              "type": "object",
+              "properties": {
+                "hostname": {"pattern": "^rock3w-[a-z0-9-]+$"},
+                "wifi": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {"const": true},
+                    "country": {"pattern": "^[A-Z]{2}$"},
+                    "security": {"const": "wpa3"}
+                  }
+                }
+              }
+            }
+          }
+        },
+        "recommendedUse": {
+          "type": "array",
+          "items": {
+            "enum": ["iot_gateway", "edge_computing", "home_automation", "sensor_hub", "development"]
+          }
+        }
+      }
+    },
+    "rk3399_khadas_edge_v": {
+      "title": "Khadas Edge-V (RK3399)",
+      "description": "Powerful RK3399 SBC with excellent thermal design and expansion capabilities",
+      "type": "object",
+      "properties": {
+        "nodeType": {"const": "sbc"},
+        "deviceCategory": {"const": "armbian_supported"},
+        "hardware": {
+          "type": "object",
+          "properties": {
+            "manufacturer": {"const": "Khadas"},
+            "model": {"const": "Edge-V"},
+            "specs": {
+              "type": "object",
+              "properties": {
+                "cpu": {"const": "Rockchip RK3399 (2x Cortex-A72 @ 2.0GHz + 4x Cortex-A53 @ 1.5GHz)"},
+                "memory": {"enum": ["2GB LPDDR4", "4GB LPDDR4"]},
+                "storage": {"const": "eMMC, microSD, M.2 SSD"},
+                "networkPorts": {"const": 1},
+                "usbPorts": {"const": 4},
+                "gpioAvailable": {"const": true},
+                "powerConsumption": {"const": "12V/2A (24W max)"}
+              }
+            }
+          }
+        },
+        "armbianConfig": {
+          "type": "object",
+          "properties": {
+            "board": {
+              "type": "object",
+              "properties": {
+                "family": {"const": "rockchip64"},
+                "name": {"const": "khadas-edge-v"},
+                "architecture": {"const": "arm64"}
+              },
+              "required": ["family", "name", "architecture"]
+            },
+            "distribution": {
+              "type": "object",
+              "properties": {
+                "release": {"enum": ["bookworm", "jammy", "noble"]},
+                "type": {"enum": ["minimal", "server", "desktop"]},
+                "desktop": {"enum": ["gnome", "kde", "xfce"]}
+              },
+              "required": ["release", "type"]
+            },
+            "bootEnvironment": {
+              "type": "object",
+              "properties": {
+                "bootloader": {"const": "u-boot"},
+                "kernelParams": {
+                  "type": "object",
+                  "properties": {
+                    "console": {"const": ["ttyS2,1500000n8"]},
+                    "rootwait": {"const": true},
+                    "splash": {"const": false}
+                  }
+                },
+                "overlays": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "array",
+                      "items": {
+                        "enum": [
+                          "rk3399-i2c1",
+                          "rk3399-spi1",
+                          "rk3399-uart4",
+                          "rk3399-pwm0",
+                          "rk3399-pwm1"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "storage": {
+              "type": "object",
+              "properties": {
+                "filesystem": {"enum": ["ext4", "btrfs"]},
+                "swapSize": {"const": 1024}
+              }
+            },
+            "network": {
+              "type": "object",
+              "properties": {
+                "hostname": {"pattern": "^khadas-edge-[a-z0-9-]+$"},
+                "wifi": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {"const": false}
+                  }
+                },
+                "ethernet": {
+                  "type": "object",
+                  "properties": {
+                    "dhcp": {"const": true}
+                  }
+                }
+              }
+            }
+          }
+        },
+        "recommendedUse": {
+          "type": "array",
+          "items": {
+            "enum": ["development", "media_center", "nas", "home_server", "ai_development"]
+          }
+        }
+      }
+    },
+    "bcm2711_rpi_cm4": {
+      "title": "Raspberry Pi Compute Module 4",
+      "description": "Industrial-grade Pi CM4 with flexible I/O and expansion options",
+      "type": "object",
+      "properties": {
+        "nodeType": {"const": "sbc"},
+        "deviceCategory": {"const": "armbian_supported"},
+        "hardware": {
+          "type": "object",
+          "properties": {
+            "manufacturer": {"const": "Raspberry Pi Foundation"},
+            "model": {"const": "Compute Module 4"},
+            "specs": {
+              "type": "object",
+              "properties": {
+                "cpu": {"const": "Broadcom BCM2711 (4x Cortex-A72 @ 1.5GHz)"},
+                "memory": {"enum": ["1GB LPDDR4", "2GB LPDDR4", "4GB LPDDR4", "8GB LPDDR4"]},
+                "storage": {"enum": ["Lite (no eMMC)", "8GB eMMC", "16GB eMMC", "32GB eMMC"]},
+                "networkPorts": {"const": 1},
+                "usbPorts": {"const": 2},
+                "gpioAvailable": {"const": true},
+                "powerConsumption": {"const": "5V/3A (15W max)"}
+              }
+            }
+          }
+        },
+        "armbianConfig": {
+          "type": "object",
+          "properties": {
+            "board": {
+              "type": "object",
+              "properties": {
+                "family": {"const": "bcm2711"},
+                "name": {"const": "rpi4b"},
+                "architecture": {"const": "arm64"},
+                "variant": {"const": "cm4"}
+              },
+              "required": ["family", "name", "architecture"]
+            },
+            "distribution": {
+              "type": "object",
+              "properties": {
+                "release": {"enum": ["bookworm", "jammy"]},
+                "type": {"enum": ["minimal", "server", "desktop"]},
+                "desktop": {"enum": ["xfce", "gnome"]}
+              },
+              "required": ["release", "type"]
+            },
+            "bootEnvironment": {
+              "type": "object",
+              "properties": {
+                "bootloader": {"const": "u-boot"},
+                "kernelParams": {
+                  "type": "object",
+                  "properties": {
+                    "console": {"const": ["serial0,115200"]},
+                    "rootwait": {"const": true}
+                  }
+                },
+                "overlays": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "array",
+                      "items": {
+                        "enum": [
+                          "i2c1",
+                          "spi0-1cs",
+                          "spi1-1cs",
+                          "uart2",
+                          "uart3",
+                          "uart4",
+                          "uart5"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "storage": {
+              "type": "object",
+              "properties": {
+                "filesystem": {"const": "ext4"},
+                "swapSize": {"const": 512}
+              }
+            },
+            "network": {
+              "type": "object",
+              "properties": {
+                "hostname": {"pattern": "^rpi-cm4-[a-z0-9-]+$"},
+                "wifi": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {"const": true},
+                    "country": {"pattern": "^[A-Z]{2}$"}
+                  }
+                }
+              }
+            }
+          }
+        },
+        "recommendedUse": {
+          "type": "array",
+          "items": {
+            "enum": ["industrial_iot", "embedded_system", "edge_computing", "automation", "prototype"]
+          }
+        }
+      }
+    },
+    "bcm2712_rpi5": {
+      "title": "Raspberry Pi 5",
+      "description": "Latest generation Pi with improved performance and PCIe connectivity",
+      "type": "object",
+      "properties": {
+        "nodeType": {"const": "sbc"},
+        "deviceCategory": {"const": "armbian_supported"},
+        "hardware": {
+          "type": "object",
+          "properties": {
+            "manufacturer": {"const": "Raspberry Pi Foundation"},
+            "model": {"const": "Raspberry Pi 5"},
+            "specs": {
+              "type": "object",
+              "properties": {
+                "cpu": {"const": "Broadcom BCM2712 (4x Cortex-A76 @ 2.4GHz)"},
+                "memory": {"enum": ["4GB LPDDR4X", "8GB LPDDR4X"]},
+                "storage": {"const": "microSD, NVMe via HAT"},
+                "networkPorts": {"const": 1},
+                "usbPorts": {"const": 4},
+                "gpioAvailable": {"const": true},
+                "powerConsumption": {"const": "5V/5A (25W max)"}
+              }
+            }
+          }
+        },
+        "armbianConfig": {
+          "type": "object",
+          "properties": {
+            "board": {
+              "type": "object",
+              "properties": {
+                "family": {"const": "bcm2712"},
+                "name": {"const": "rpi5b"},
+                "architecture": {"const": "arm64"}
+              },
+              "required": ["family", "name", "architecture"]
+            },
+            "distribution": {
+              "type": "object",
+              "properties": {
+                "release": {"enum": ["bookworm", "trixie"]},
+                "type": {"enum": ["minimal", "server", "desktop"]},
+                "desktop": {"enum": ["xfce", "gnome", "kde"]}
+              },
+              "required": ["release", "type"]
+            },
+            "bootEnvironment": {
+              "type": "object",
+              "properties": {
+                "bootloader": {"const": "u-boot"},
+                "kernelParams": {
+                  "type": "object",
+                  "properties": {
+                    "console": {"const": ["serial0,115200"]},
+                    "rootwait": {"const": true}
+                  }
+                },
+                "overlays": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "array",
+                      "items": {
+                        "enum": [
+                          "i2c1",
+                          "spi0-1cs",
+                          "uart2",
+                          "pcie-32bit-dma"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "storage": {
+              "type": "object",
+              "properties": {
+                "filesystem": {"const": "ext4"},
+                "swapSize": {"const": 1024}
+              }
+            },
+            "network": {
+              "type": "object",
+              "properties": {
+                "hostname": {"pattern": "^rpi5-[a-z0-9-]+$"},
+                "wifi": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {"const": true},
+                    "country": {"pattern": "^[A-Z]{2}$"}
+                  }
+                }
+              }
+            }
+          }
+        },
+        "recommendedUse": {
+          "type": "array",
+          "items": {
+            "enum": ["desktop", "development", "media_center", "home_server", "ai_inference"]
+          }
+        },
+        "knownIssues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "Requires active cooling for sustained loads",
+            "Official PSU recommended for stability",
+            "Some legacy HATs may not be compatible"
+          ]
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+} 

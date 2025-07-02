@@ -2,26 +2,78 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://bbos.dev/schemas/index.json",
   "title": "BBOS Schema Index",
-  "description": "Index of all available BBOS schemas",
+  "description": "Index of all available JSON schemas for BBOS",
   "type": "object",
   "properties": {
     "schemas": {
-      "type": "object",
-      "properties": {
-        "user": {
-          "$ref": "https://bbos.dev/schemas/user.schema.json",
-          "description": "User entity with social login integration"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": ["core", "armbian", "network", "build", "user"]
+          }
         },
-        "armbianConfiguration": {
-          "$ref": "https://bbos.dev/schemas/armbian-configuration.schema.json",
-          "description": "Complete Armbian image configuration"
-        },
-        "buildJob": {
-          "$ref": "https://bbos.dev/schemas/build-job.schema.json",
-          "description": "Build job with real-time status tracking"
-        }
+        "required": ["id", "title", "description", "version", "category"]
       },
-      "additionalProperties": false
+      "default": [
+        {
+          "id": "https://bbos.dev/schemas/user.schema.json",
+          "title": "User",
+          "description": "User account and authentication schema",
+          "version": "1.0.0",
+          "category": "user"
+        },
+        {
+          "id": "https://bbos.dev/schemas/build-job.schema.json",
+          "title": "Build Job",
+          "description": "Armbian build job configuration and status",
+          "version": "1.0.0",
+          "category": "build"
+        },
+        {
+          "id": "https://bbos.dev/schemas/armbian-configuration.schema.json",
+          "title": "Armbian Configuration",
+          "description": "Complete Armbian image configuration",
+          "version": "1.0.0",
+          "category": "armbian"
+        },
+        {
+          "id": "https://bbos.dev/schemas/network-node.schema.json",
+          "title": "Network Node",
+          "description": "Network-centric device node with Armbian configuration",
+          "version": "1.0.0",
+          "category": "network"
+        },
+        {
+          "id": "https://bbos.dev/schemas/network.schema.json",
+          "title": "Network Infrastructure",
+          "description": "Comprehensive network infrastructure definition",
+          "version": "1.0.0",
+          "category": "network"
+        },
+        {
+          "id": "https://bbos.dev/schemas/device-templates.json",
+          "title": "Device Templates",
+          "description": "SBC device templates with verified configurations",
+          "version": "1.0.0",
+          "category": "network"
+        }
+      ]
     },
     "version": {
       "type": "string",

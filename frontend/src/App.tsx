@@ -27,6 +27,7 @@ import BuildViewer from '@/panels/BuildViewer'
 import { HardwareFlashPanel } from '@/panels/HardwareFlashPanel'
 import { HardwareUtilitiesPanel } from '@/panels/HardwareUtilitiesPanel'
 import { ImageRunnerPanel } from '@/panels/ImageRunnerPanel'
+import { NetworkPanel } from '@/panels/NetworkPanel'
 import 'flexlayout-react/style/light.css'
 import './App.css'
 
@@ -599,6 +600,57 @@ const AppContent: React.FC<AppProps> = ({ theme = 'light' }) => {
               console.log('Refreshing builds for image runner...')
               // Send request for latest builds
               socketService.send('build:refresh')
+            }}
+          />
+        )
+
+      case 'NetworkPanel':
+        return (
+          <NetworkPanel
+            onAddDevice={(deviceTemplate: string, configuration: any) => {
+              console.log('Adding device from template:', deviceTemplate, configuration)
+              // TODO: Integrate with build system to create device image
+              notification.success({
+                message: 'Device Creation Started',
+                description: `Creating device from ${deviceTemplate} template`,
+                placement: 'topRight'
+              })
+            }}
+            onUpdateNode={(nodeId: string, updates: any) => {
+              console.log('Updating network node:', nodeId, updates)
+              // TODO: Persist node updates to backend
+              notification.success({
+                message: 'Node Updated',
+                description: `Network node ${nodeId} has been updated`,
+                placement: 'topRight'
+              })
+            }}
+            onDeleteNode={(nodeId: string) => {
+              console.log('Deleting network node:', nodeId)
+              // TODO: Handle node deletion
+              notification.success({
+                message: 'Node Deleted',
+                description: `Network node ${nodeId} has been deleted`,
+                placement: 'topRight'
+              })
+            }}
+            onBuildNode={(nodeId: string) => {
+              console.log('Building node configuration:', nodeId)
+              // TODO: Trigger Armbian build for node
+              notification.info({
+                message: 'Build Started',
+                description: `Building Armbian image for node ${nodeId}`,
+                placement: 'topRight'
+              })
+            }}
+            onFlashNode={(nodeId: string) => {
+              console.log('Flashing node:', nodeId)
+              // TODO: Trigger hardware flashing for node
+              notification.info({
+                message: 'Flash Started',
+                description: `Flashing image to node ${nodeId}`,
+                placement: 'topRight'
+              })
             }}
           />
         )
