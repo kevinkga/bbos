@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Card, 
   Steps, 
@@ -95,7 +95,8 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
   const [compressionProgress, setCompressionProgress] = useState<CompressionProgress | null>(null);
   const [loadingDevices, setLoadingDevices] = useState(false);
   
-  const webSerialFlasher = new WebSerialFlasher();
+  // Use useRef to maintain stable instance across renders
+  const webSerialFlasher = useRef(new WebSerialFlasher()).current;
   const completedBuilds = builds.filter(build => build.status === 'completed');
 
   // Fetch serial devices (browser)
@@ -192,14 +193,30 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
 
   // Handle method selection
   const handleMethodSelect = (method: 'browser' | 'webusb') => {
+    console.log(`📱 Method selected: ${method}`);
     setFlashMethod(method);
     setCurrentStep(currentStep + 1);
+    console.log(`✅ Method selection complete: ${method}`);
     
-    // Fetch appropriate devices for the selected method
+    // Fetch devices with timeout to prevent hanging
     if (method === 'webusb') {
-      fetchRockchipDevices();
+      console.log('🔍 Fetching WebUSB devices with timeout...');
+      Promise.race([
+        fetchRockchipDevices(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+      ]).catch(error => {
+        console.error('❌ WebUSB device fetch failed or timed out:', error);
+        message.warning('WebUSB device detection timed out, you can manually add devices in Step 4.');
+      });
     } else if (method === 'browser') {
-      fetchSerialDevices();
+      console.log('🔍 Fetching Serial devices with timeout...');
+      Promise.race([
+        fetchSerialDevices(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+      ]).catch(error => {
+        console.error('❌ Serial device fetch failed or timed out:', error);
+        message.warning('Serial device detection timed out, you can manually add devices in Step 4.');
+      });
     }
   };
 
@@ -420,8 +437,8 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
     },
     {
       title: 'Select Device',
-      description: 'Choose device in maskrom mode',
-      icon: <GlobalOutlined />
+      description: flashMethod === 'webusb' ? 'Choose Rockchip device in maskrom mode' : 'Choose device with serial interface',
+      icon: flashMethod === 'webusb' ? <UsbOutlined /> : <GlobalOutlined />
     },
     ...(flashMethod === 'webusb' && webUSBStorageDevices.length > 0 ? [{
       title: 'Select Storage',
@@ -602,6 +619,7 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
                     <Radio.Button 
                       value="browser" 
                       disabled={!webSerialSupported()}
+                      onClick={() => handleMethodSelect('browser')}
                       style={{ 
                         height: 'auto', 
                         padding: '16px',
@@ -611,10 +629,10 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
                       <div>
                         <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '4px' }}>
                           <GlobalOutlined style={{ marginRight: '8px' }} />
-                          Browser Method (Serial) {!webSerialSupported() && '(Not Supported)'}
+                          Browser Serial Method {!webSerialSupported() && '(Not Supported)'}
                         </div>
                         <div style={{ color: colors.text.secondary }}>
-                          Browser serial communication. Limited device support.
+                          For devices with serial consoles. Does NOT use maskrom mode.
                         </div>
                       </div>
                     </Radio.Button>
@@ -622,6 +640,7 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
                     <Radio.Button 
                       value="webusb" 
                       disabled={!isWebUSBSupported()}
+                      onClick={() => handleMethodSelect('webusb')}
                       style={{ 
                         height: 'auto', 
                         padding: '16px',
@@ -631,10 +650,10 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
                       <div>
                         <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '4px' }}>
                           <UsbOutlined style={{ marginRight: '8px' }} />
-                          WebUSB Method (Rockchip) {!isWebUSBSupported() && '(Not Supported)'}
+                          WebUSB Maskrom Method {!isWebUSBSupported() && '(Not Supported)'}
                         </div>
                         <div style={{ color: colors.text.secondary }}>
-                          Direct Rockchip device flashing via WebUSB. Chrome/Edge only.
+                          Direct Rockchip maskrom flashing via WebUSB. Recommended for NVME.
                         </div>
                       </div>
                     </Radio.Button>
@@ -648,18 +667,18 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
               <Card 
                 title={
                   <Space>
-                    <GlobalOutlined style={{ color: colors.accent[500] }} />
-                    <span>Step 4: Select Device in Maskrom Mode</span>
+                    {flashMethod === 'webusb' ? <UsbOutlined style={{ color: colors.accent[500] }} /> : <GlobalOutlined style={{ color: colors.accent[500] }} />}
+                    <span>Step 4: Select {flashMethod === 'webusb' ? 'Maskrom' : 'Serial'} Device</span>
                   </Space>
                 }
                 style={{ backgroundColor: colors.background.primary }}
               >
                 <Alert
                   message="Device Detection"
-                  description={`Connect your device in maskrom mode and select it below. The selected flash method is: ${
-                    flashMethod === 'webusb' ? 'WebUSB (Rockchip Direct)' : 
-                    'Browser (Web Serial)'
-                  }`}
+                  description={flashMethod === 'webusb' ? 
+                    'Connect your Rockchip device in maskrom mode and select it below. WebUSB will communicate directly with the device to flash your NVME/eMMC.' :
+                    'Connect a device with serial console access. This method does NOT require maskrom mode.'
+                  }
                   type="info"
                   showIcon
                   style={{ marginBottom: '16px' }}
