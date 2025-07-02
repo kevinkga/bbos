@@ -15,6 +15,7 @@ import * as zlib from 'zlib';
 import { ArmbianBuilder, ArmbianConfiguration } from './services/armbianBuilder.js';
 import { BuildTracker, BuildJob } from './services/buildTracker.js';
 import { HardwareFlasher, FlashProgress } from './services/hardwareFlasher.js';
+import { BootloaderService } from './services/bootloaderService.js';
 
 // Load environment variables
 dotenv.config();
@@ -29,6 +30,7 @@ const CORS_ORIGINS = process.env.CORS_ORIGINS?.split(',') || ['http://localhost:
 const buildTracker = new BuildTracker(process.env.BUILD_DIR || '/tmp/bbos-builds');
 const armbianBuilder = new ArmbianBuilder();
 const hardwareFlasher = new HardwareFlasher();
+const bootloaderService = new BootloaderService();
 
 const app = express();
 const httpServer = createServer(app);
@@ -803,6 +805,60 @@ app.get('/api/hardware/spi/bootloader/:filename', async (req: express.Request, r
   } catch (error) {
     console.error('❌ Failed to serve bootloader file:', error);
     res.status(500).json({ error: 'Failed to serve bootloader file' });
+  }
+});
+
+// Add bootloader API routes
+app.get('/api/bootloader/:chipType/:filename', async (req, res) => {
+  try {
+    const { chipType, filename } = req.params;
+    
+    console.log(`📁 Bootloader file requested: ${chipType}/${filename}`);
+    
+    const fileBuffer = await bootloaderService.getBootloaderFile(chipType, filename);
+    
+    if (!fileBuffer) {
+      console.log(`❌ Bootloader file not found: ${chipType}/${filename}`);
+      return res.status(404).json({ 
+        error: 'Bootloader file not found',
+        chipType,
+        filename,
+        message: `File ${filename} not available for chip type ${chipType}`
+      });
+    }
+    
+    // Set appropriate headers
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', fileBuffer.length);
+    
+    console.log(`✅ Serving bootloader file: ${filename} (${fileBuffer.length} bytes)`);
+    res.send(fileBuffer);
+    
+  } catch (error) {
+    console.error('❌ Error serving bootloader file:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// List available bootloader files
+app.get('/api/bootloader', async (req, res) => {
+  try {
+    const files = await bootloaderService.listBootloaderFiles();
+    res.json({ 
+      success: true,
+      files,
+      count: files.length
+    });
+  } catch (error) {
+    console.error('❌ Error listing bootloader files:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : String(error)
+    });
   }
 });
 

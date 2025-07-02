@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Layout, Card, Typography, Space, Button, message } from 'antd';
+import { Layout, Card, Typography, Space, Button } from 'antd';
 import { ThunderboltOutlined, BuildOutlined, EyeOutlined } from '@ant-design/icons';
 import { BuildsPanel } from '../panels/BuildsPanel';
 import { BuildViewer } from '../panels/BuildViewer';
 import { BuildJob } from '../types';
+import { messageService } from '../services/messageService';
 
 const { Sider, Content } = Layout;
 const { Title, Text } = Typography;
@@ -86,17 +87,17 @@ export const IntegratedFlashingDemo: React.FC = () => {
   };
 
   const handleBuildDoubleClick = (build: BuildJob) => {
-    message.info(`Opening build details: ${build.configurationSnapshot?.name}`);
+    messageService.info(`Opening build details: ${build.configurationSnapshot?.name}`);
     setSelectedBuild(build);
   };
 
   const handleArtifactDownload = (buildId: string, artifactName: string) => {
-    message.success(`Downloading ${artifactName} from build ${buildId}`);
+    messageService.success(`Downloading ${artifactName} from build ${buildId}`);
     // Implement download logic
   };
 
   const handleImageFlash = (buildId: string, imageName: string) => {
-    message.info(`Flash interface opened for ${imageName}`);
+    messageService.info(`Flash interface opened for ${imageName}`);
     // Flash drawer will open automatically from BuildsPanel
   };
 
@@ -104,12 +105,12 @@ export const IntegratedFlashingDemo: React.FC = () => {
     const build = builds.find(b => b.id === buildId);
     if (build) {
       setSelectedBuild(build);
-      message.info('Viewing build logs');
+      messageService.info('Viewing build logs');
     }
   };
 
   const handleCancelBuild = (buildId: string) => {
-    message.warning(`Cancelled build ${buildId}`);
+    messageService.warning(`Cancelled build ${buildId}`);
     // Implement build cancellation
   };
 
@@ -165,7 +166,7 @@ export const IntegratedFlashingDemo: React.FC = () => {
                   build={selectedBuild}
                   onDownloadArtifact={handleArtifactDownload}
                   onViewArtifact={(buildId, artifactName) => {
-                    message.info(`Viewing artifact: ${artifactName}`);
+                    messageService.info(`Viewing artifact: ${artifactName}`);
                   }}
                 />
               ) : (

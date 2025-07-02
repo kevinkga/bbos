@@ -20,7 +20,13 @@
     "docker:run": "docker run -p 3001:3001 bbos-backend",
     "db:migrate": "tsx src/scripts/migrate.ts",
     "db:seed": "tsx src/scripts/seed.ts",
-    "generate:types": "tsx src/scripts/generate-types.ts"
+    "generate:types": "tsx src/scripts/generate-types.ts",
+    "collect-bootloader": "chmod +x collect-bootloader.sh && ./collect-bootloader.sh",
+    "download-bootloaders": "chmod +x download-sample-bootloaders.sh && ./download-sample-bootloaders.sh",
+    "extract-bootloaders": "chmod +x extract-real-bootloaders.sh && ./extract-real-bootloaders.sh",
+    "create-test-bootloaders": "chmod +x create-test-bootloaders.sh && ./create-test-bootloaders.sh",
+    "setup-bootloaders": "./setup-real-bootloaders.sh",
+    "remove-placeholders": "rm -rf data/bootloader && echo 'Placeholder bootloaders removed. Run npm run setup-bootloaders for instructions.'"
   },
   "dependencies": {
     "@prisma/client": "^5.12.1",

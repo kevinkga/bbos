@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react'
-import { Card, Button, Typography, Space, Divider, message, Modal, Tabs, Steps, Progress, Row, Col, Alert } from 'antd'
+import { Card, Button, Typography, Space, Divider, Modal, Tabs, Steps, Progress, Row, Col, Alert } from 'antd'
 import { SaveOutlined, SettingOutlined, InfoCircleOutlined, ReloadOutlined, DeleteOutlined, ArrowLeftOutlined, ArrowRightOutlined, CheckCircleOutlined, FormOutlined, ExclamationCircleOutlined, ClockCircleOutlined, CompassOutlined } from '@ant-design/icons'
 import Form from '@rjsf/antd'
 import validator from '@rjsf/validator-ajv8'
@@ -7,6 +7,7 @@ import { RJSFSchema, ErrorSchema, UiSchema } from '@rjsf/utils'
 import { ArmbianConfiguration } from '@/types'
 import { colors, components, spacing } from '@/styles/design-tokens'
 import { useSocketService } from '@/services/socketService'
+import { messageService } from '@/services/messageService'
 
 const { Title, Text } = Typography
 const { TabPane } = Tabs
@@ -84,7 +85,7 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
       });
       
       setBuildStatus('pending');
-      message.success('Build submitted successfully!');
+              messageService.success('Build submitted successfully!');
     };
 
     const handleBuildUpdate = (build: any) => {
@@ -150,7 +151,7 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
       const timestamp = new Date().toLocaleTimeString();
       setBuildLog((prev) => `${prev}\n[${timestamp}] ❌ Error: ${error.error}`);
       setBuildStatus('failed');
-      message.error(error.error || 'Build submission failed');
+              messageService.error(error.error || 'Build submission failed');
     };
 
     // Subscribe to socket events
@@ -841,7 +842,7 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
         version: (initialConfig?.version || 0) + 1
       }
       onSave?.(config)
-      message.success('Configuration saved successfully!')
+      messageService.success('Configuration saved successfully!')
     }
   }, [isValid, onSave, initialConfig])
 
@@ -851,12 +852,12 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
     setIsValid(true)
     setCurrentStep(0)
     setStepValidation([])
-    message.info('Form reset to initial values')
+    messageService.info('Form reset to initial values')
   }, [initialConfig])
 
   const handleDelete = useCallback(() => {
     if (!initialConfig?.id) {
-      message.error('Cannot delete: No configuration ID found')
+      messageService.error('Cannot delete: No configuration ID found')
       return
     }
 
@@ -868,7 +869,7 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
       cancelText: 'Cancel',
       onOk() {
         onDelete?.(initialConfig.id!)
-        message.success('Configuration deleted successfully')
+        messageService.success('Configuration deleted successfully')
       }
     })
   }, [initialConfig, onDelete])
@@ -918,7 +919,7 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
     setBuildStatus('pending')
     
     socketService.send('build:submit', { configuration: formData, userId: 'default-user' });
-    message.loading('Build started...');
+          messageService.info('Build started...');
   }, [socketService, formData, resetBuildState]);
 
   // Render wizard content
@@ -934,7 +935,7 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
           borderBottom: `1px solid ${colors.border.light}`
         }}>
           <Row align="middle">
-            <Col span={12}>
+            <Col span={10}>
               <div style={{ display: 'flex', alignItems: 'center', gap: spacing.lg }}>
                 <Progress 
                   type="circle"
@@ -963,7 +964,7 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
                 </div>
               </div>
             </Col>
-            <Col span={12} style={{ textAlign: 'right' }}>
+            <Col span={8} style={{ textAlign: 'center' }}>
               <Space direction="vertical" size={2} style={{ width: '100%' }}>
                 <Text style={{ 
                   color: colors.text.secondary, 
@@ -978,6 +979,35 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
                 }}>
                   Use Quick Navigation panel to jump between steps
                 </Text>
+              </Space>
+            </Col>
+            <Col span={6} style={{ textAlign: 'right' }}>
+              <Space>
+                <Button 
+                  type="primary" 
+                  icon={<SaveOutlined />}
+                  onClick={() => handleSubmit({ formData })}
+                  disabled={readonly || !isValid}
+                  style={{
+                    backgroundColor: colors.accent[500],
+                    borderColor: colors.accent[500],
+                    color: colors.text.inverse
+                  }}
+                >
+                  Save Configuration
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<CheckCircleOutlined />}
+                  onClick={handleBuild}
+                  disabled={readonly || !isValid}
+                  style={{
+                    backgroundColor: colors.success[500],
+                    borderColor: colors.success[500]
+                  }}
+                >
+                  Build
+                </Button>
               </Space>
             </Col>
           </Row>
@@ -1023,18 +1053,6 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
                 Next Step
               </Button>
             )}
-            <Button
-              type="primary"
-              icon={<CheckCircleOutlined />}
-              onClick={handleBuild}
-              disabled={!isValid || readonly}
-              style={{
-                backgroundColor: colors.success[500],
-                borderColor: colors.success[500]
-              }}
-            >
-              Build
-            </Button>
           </Space>
         </div>
 
@@ -1522,8 +1540,7 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
                     disabled={readonly || !isValid}
                     style={{
                       backgroundColor: colors.success[500],
-                      borderColor: colors.success[500],
-                      marginLeft: spacing.md
+                      borderColor: colors.success[500]
                     }}
                   >
                     Build

@@ -18,7 +18,9 @@ import {
   Spin,
   message,
   Modal,
-  Checkbox
+  Checkbox,
+  App,
+  notification
 } from 'antd';
 import { 
   UsbOutlined, 
@@ -29,20 +31,18 @@ import {
   DesktopOutlined,
   GlobalOutlined,
   InfoCircleOutlined,
-  ClockCircleOutlined,
-  WarningOutlined,
-  SafetyOutlined
+  ClockCircleOutlined
 } from '@ant-design/icons';
 import { WebSerialFlasher, SerialDevice, FlashProgressWeb, webSerialSupported } from '../services/webSerialFlasher';
 import { WebUSBRockchipFlasher, RockchipDevice, WebUSBStorageDevice } from '../services/webUSBFlasher';
 import { compressionService, CompressionProgress } from '../services/compressionService';
 import { FlashInstructions } from '../components/FlashInstructions';
 import { SerialDebugInfo } from '../components/SerialDebugInfo';
+import { SegmentedProgressBar } from '../components/SegmentedProgressBar';
+import { CompressionProgressBar } from '../components/CompressionProgressBar';
 import { colors } from '../styles/design-tokens';
 
 const { Title, Text, Paragraph } = Typography;
-const { Step } = Steps;
-const { Option } = Select;
 
 interface Build {
   id: string;
@@ -59,30 +59,15 @@ interface Build {
   }>;
 }
 
-interface BackendDevice {
-  id: string;
-  type: string;
-  chipInfo?: string;
-  status?: string;
-}
 
-interface StorageDevice {
-  type: 'emmc' | 'sd' | 'spinor';
-  name: string;
-  code: number;
-  available: boolean;
-  capacity?: string;
-  flashInfo?: string;
-  recommended?: boolean;
-  description: string;
-}
 
 interface HardwareFlashPanelProps {
   builds: Build[];
   onRefresh?: () => void;
 }
 
-export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, onRefresh }) => {
+export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds }) => {
+  const { message: messageApi } = App.useApp();
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedBuild, setSelectedBuild] = useState<Build | null>(null);
   const [selectedImageFile, setSelectedImageFile] = useState<string>('');
@@ -138,7 +123,14 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
     setLoadingStorage(true);
     try {
       console.log('🔍 Detecting WebUSB storage devices...');
-      const devices = await WebUSBRockchipFlasher.detectStorageDevices(rkDevice);
+      const devices = await WebUSBRockchipFlasher.detectStorageDevices(
+        rkDevice,
+        (progress) => {
+          console.log('📊 Storage detection progress:', progress);
+          // Optionally set a temporary flash progress to show detection progress
+          // setFlashProgress(progress);
+        }
+      );
       setWebUSBStorageDevices(devices);
       
       // Auto-select recommended storage
@@ -152,10 +144,13 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
         }
       }
       
-      message.success(`Detected ${devices.filter(d => d.available).length} storage device(s)`);
+      // Use console.log instead of message.success to avoid the Antd context warning
+      const availableCount = devices.filter(d => d.available).length;
+      console.log(`✅ Detected ${availableCount} storage device(s)`);
     } catch (error) {
       console.error('Failed to fetch WebUSB storage devices:', error);
-      message.error('Failed to detect WebUSB storage devices');
+      // Use console.error instead of message.error
+      console.error('❌ Failed to detect WebUSB storage devices');
       setWebUSBStorageDevices([]);
     } finally {
       setLoadingStorage(false);
@@ -216,7 +211,7 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
         new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
       ]).catch(error => {
         console.error('❌ WebUSB device fetch failed or timed out:', error);
-        message.warning('WebUSB device detection timed out, you can manually add devices in Step 4.');
+        messageApi.warning('WebUSB device detection timed out, you can manually add devices in Step 4.');
       });
     } else if (method === 'browser') {
       console.log('🔍 Fetching Serial devices with timeout...');
@@ -225,7 +220,7 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
         new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
       ]).catch(error => {
         console.error('❌ Serial device fetch failed or timed out:', error);
-        message.warning('Serial device detection timed out, you can manually add devices in Step 4.');
+        messageApi.warning('Serial device detection timed out, you can manually add devices in Step 4.');
       });
     }
   };
@@ -256,7 +251,7 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
   // Browser flash implementation
   const handleBrowserFlash = async () => {
     if (!selectedDevice || !('port' in selectedDevice)) {
-      message.error('Please select a valid serial device');
+      messageApi.error('Please select a valid serial device');
       return;
     }
 
@@ -274,7 +269,7 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
         file,
         (progress) => setFlashProgress(progress)
       );
-      message.success('Flash completed successfully');
+      messageApi.success('Flash completed successfully');
     } catch (error) {
       console.error('Browser flash failed:', error);
       throw error;
@@ -284,12 +279,12 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
   // WebUSB flash implementation with compression
   const handleWebUSBFlash = async () => {
     if (!selectedDevice || !('chipType' in selectedDevice)) {
-      message.error('Please select a valid Rockchip device');
+      messageApi.error('Please select a valid Rockchip device');
       return;
     }
 
     if (!selectedBuild) {
-      message.error('Please select a build');
+      messageApi.error('Please select a build');
       return;
     }
 
@@ -324,12 +319,9 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
         rkDevice,
         imageData.buffer,
         (progress) => {
-          // Map WebUSB flash progress to web flash progress format
+          // Convert WebUSB flash progress to web flash progress format
           const webProgress: FlashProgressWeb = {
-            phase: progress.phase === 'detecting' ? 'connecting' :
-                   progress.phase === 'loading_bootloader' ? 'preparing' :
-                   progress.phase === 'writing' ? 'flashing' :
-                   progress.phase,
+            phase: progress.phase, // Keep original phases for SegmentedProgressBar
             progress: progress.progress,
             message: progress.message,
             bytesTransferred: progress.bytesWritten,
@@ -345,7 +337,20 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
         await handleDeviceReboot();
       }
 
-      message.success('Flash completed successfully');
+      // Show comprehensive success message
+      messageApi.success({
+        content: 'Image flashed successfully! Your device is ready to boot.',
+        duration: 6,
+        style: { fontWeight: 'bold' }
+      });
+      
+      // Show detailed success notification
+      notification.success({
+        message: 'Image Flash Successful',
+        description: `Successfully flashed ${selectedImageFile} to ${storage?.name || 'the selected storage device'}. ${rebootAfterFlash ? 'Device has been rebooted and should start normally.' : 'You can now disconnect and boot your device.'}`,
+        duration: 10,
+        placement: 'topRight'
+      });
     } catch (error) {
       console.error('WebUSB flash failed:', error);
       throw error;
@@ -355,7 +360,7 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
   // Request additional serial device
   const handleRequestSerialDevice = async () => {
     if (!webSerialSupported()) {
-      message.error('Web Serial not supported in this browser');
+      messageApi.error('Web Serial not supported in this browser');
       return;
     }
 
@@ -442,7 +447,7 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
   // Handle SPI clear operation using backend API (more reliable than WebUSB)
   const handleSPIClear = async () => {
     if (!selectedDevice || !('chipType' in selectedDevice)) {
-      message.error('Please select a valid Rockchip device');
+      messageApi.error('Please select a valid Rockchip device');
       return;
     }
 
@@ -453,12 +458,9 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
       await WebUSBRockchipFlasher.clearSPIFlash(
         rkDevice,
         (progress) => {
-          // Map WebUSB flash progress to web flash progress format
+          // Convert WebUSB flash progress to web flash progress format
           const webProgress: FlashProgressWeb = {
-            phase: progress.phase === 'detecting' ? 'connecting' :
-                   progress.phase === 'loading_bootloader' ? 'preparing' :
-                   progress.phase === 'writing' ? 'flashing' :
-                   progress.phase,
+            phase: progress.phase, // Keep original phases for SegmentedProgressBar
             progress: progress.progress,
             message: progress.message,
             bytesTransferred: progress.bytesWritten,
@@ -467,74 +469,237 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
           setFlashProgress(webProgress);
         }
       );
-      message.success('SPI flash cleared successfully');
+      
+      // Show comprehensive success message for SPI clear
+      messageApi.success({
+        content: 'SPI flash cleared successfully! The device is ready for new bootloader installation.',
+        duration: 6,
+        style: { fontWeight: 'bold' }
+      });
+      
+      // Show detailed success notification
+      notification.success({
+        message: 'SPI Flash Cleared',
+        description: 'The SPI flash chip has been completely erased. You can now write a new bootloader or perform other operations.',
+        duration: 8,
+        placement: 'topRight'
+      });
     } catch (error) {
       console.error('SPI clear failed:', error);
-      message.error('Failed to clear SPI flash');
+      messageApi.error('Failed to clear SPI flash');
     } finally {
       setIsSpiOperation(false);
     }
   };
 
-  // Handle SPI bootloader write
+  // Handle SPI bootloader write with improved error handling and timeout protection
   const handleSPIBootloaderWrite = async () => {
     if (!selectedDevice || !('chipType' in selectedDevice)) {
-      message.error('Please select a valid Rockchip device');
+      messageApi.error('Please select a valid Rockchip device');
       return;
     }
 
     const rkDevice = selectedDevice as RockchipDevice;
     setIsSpiOperation(true);
+    setIsFlashing(true);
+    let operationSucceeded = false;
+    let operationStartTime = Date.now();
 
     try {
-      await WebUSBRockchipFlasher.writeSPIBootloaderAuto(
-        rkDevice,
-        (progress) => {
-          // Map WebUSB flash progress to web flash progress format
-          const webProgress: FlashProgressWeb = {
-            phase: progress.phase === 'detecting' ? 'connecting' :
-                   progress.phase === 'loading_bootloader' ? 'preparing' :
-                   progress.phase === 'writing' ? 'flashing' :
-                   progress.phase,
-            progress: progress.progress,
-            message: progress.message,
-            bytesTransferred: progress.bytesWritten,
-            totalBytes: progress.totalBytes
-          };
-          setFlashProgress(webProgress);
+      console.log('🚀 Starting SPI bootloader write operation...');
+      
+      // Set up a UI timeout handler to show status updates
+      const progressTimer = setInterval(() => {
+        const elapsed = Date.now() - operationStartTime;
+        const minutes = Math.floor(elapsed / 60000);
+        const seconds = Math.floor((elapsed % 60000) / 1000);
+        
+        if (elapsed > 300000) { // 5 minutes
+          console.warn(`⚠️ SPI operation running for ${minutes}m ${seconds}s - this is longer than expected`);
         }
-      );
-      message.success('SPI bootloader written successfully');
+      }, 30000); // Check every 30 seconds
+      
+      try {
+        await WebUSBRockchipFlasher.writeSPIBootloaderAuto(
+          rkDevice,
+          (progress) => {
+            console.log('📊 SPI Bootloader Progress:', progress);
+            const webProgress: FlashProgressWeb = {
+              phase: progress.phase, // Keep original phases for SegmentedProgressBar
+              progress: progress.progress,
+              message: progress.message,
+              bytesTransferred: progress.bytesWritten,
+              totalBytes: progress.totalBytes
+            };
+            setFlashProgress(webProgress);
+            
+            // Check if operation completed successfully
+            if (progress.phase === 'completed' && progress.progress === 100) {
+              operationSucceeded = true;
+            }
+          }
+        );
+      } finally {
+        clearInterval(progressTimer);
+      }
+      
+      // Show success message and notification
+      operationSucceeded = true;
+      messageApi.success({
+        content: 'SPI bootloader written successfully! Your device is now ready to boot.',
+        duration: 6,
+        style: { fontWeight: 'bold' }
+      });
+      
+      // Show a more prominent success notification
+      notification.success({
+        message: 'Bootloader Write Successful',
+        description: 'The SPI bootloader has been successfully written to your device. You can now disconnect and boot your device normally.',
+        duration: 8,
+        placement: 'topRight'
+      });
+      
     } catch (error) {
       console.error('SPI bootloader write failed:', error);
-      message.error('Failed to write SPI bootloader');
+      
+      // Enhanced error message handling with timeout-specific messages
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      if (errorMessage.includes('timed out after 10 minutes') || errorMessage.includes('timeout')) {
+        Modal.error({
+          title: 'Operation Timed Out',
+          content: (
+            <div>
+              <p><strong>The SPI bootloader write operation timed out.</strong></p>
+              <p>This usually happens when USB transfers get stuck or the device stops responding.</p>
+              <br />
+              <p><strong>What to try:</strong></p>
+              <ol>
+                <li>Disconnect the USB cable from your device</li>
+                <li>Put the device back into maskrom mode (power + reset)</li>
+                <li>Reconnect the USB cable</li>
+                <li>Try the operation again</li>
+                <li>If the issue persists, try a different USB cable or port</li>
+              </ol>
+              <br />
+              <p><strong>Technical details:</strong> {errorMessage}</p>
+            </div>
+          ),
+          width: 600
+        });
+      } else if (errorMessage.includes('USB transfer timeout') || errorMessage.includes('Device disconnected')) {
+        Modal.error({
+          title: 'USB Communication Error',
+          content: (
+            <div>
+              <p><strong>The device stopped responding during the write operation.</strong></p>
+              <p>This can happen due to USB connection issues or device state problems.</p>
+              <br />
+              <p><strong>What to try:</strong></p>
+              <ol>
+                <li>Check that the USB cable is securely connected</li>
+                <li>Try a different USB cable (preferably USB 2.0)</li>
+                <li>Use a different USB port (avoid USB hubs)</li>
+                <li>Restart the browser and try again</li>
+                <li>Put the device back in maskrom mode</li>
+              </ol>
+              <br />
+              <p><strong>Error details:</strong> {errorMessage}</p>
+            </div>
+          ),
+          width: 600
+        });
+      } else if (errorMessage.includes('too small') || errorMessage.includes('not found')) {
+        Modal.error({
+          title: 'Bootloader Files Missing',
+          content: (
+            <div>
+              <p><strong>Real bootloader files are required for SPI operations.</strong></p>
+              <p>The system detected placeholder or missing bootloader files.</p>
+              <br />
+              <p><strong>To fix this:</strong></p>
+              <ol>
+                <li>Build Armbian for your device to generate bootloader files</li>
+                <li>Or extract bootloader files from an existing Armbian image</li>
+                <li>Place files in: <code>backend/data/bootloader/rk3588/</code></li>
+              </ol>
+              <br />
+              <p><strong>Required files:</strong></p>
+              <ul>
+                <li><code>rock5b_idbloader.img</code> (should be &gt;200KB)</li>
+                <li><code>rock5b_u-boot.itb</code> (should be &gt;400KB)</li>
+              </ul>
+              <br />
+              <p><strong>Error:</strong> {errorMessage}</p>
+            </div>
+          ),
+          width: 600
+        });
+      } else {
+        // Generic error handling
+        const isTimeoutRelated = errorMessage.toLowerCase().includes('timeout') || 
+                                 errorMessage.toLowerCase().includes('stuck') ||
+                                 errorMessage.toLowerCase().includes('hang');
+        
+        if (isTimeoutRelated) {
+          messageApi.error(`Operation failed due to timeout or communication issue: ${errorMessage}. Try disconnecting and reconnecting the device.`);
+        } else {
+          messageApi.error(`SPI bootloader write failed: ${errorMessage}`);
+        }
+      }
+      
+      setFlashProgress({
+        phase: 'failed',
+        progress: 0,
+        message: `SPI bootloader write failed: ${errorMessage}`
+      });
     } finally {
       setIsSpiOperation(false);
+      setIsFlashing(false);
+      
+      // If operation succeeded but there was some other issue, still show partial success
+      if (operationSucceeded && flashProgress?.phase === 'completed') {
+        messageApi.info('Bootloader operation completed. Please check the detailed status above.');
+      }
     }
   };
 
   // Handle device reboot
   const handleDeviceReboot = async () => {
     if (!selectedDevice || flashMethod !== 'webusb' || !('chipType' in selectedDevice)) {
-      message.error('Device reboot requires a WebUSB Rockchip device');
+      messageApi.error('Device reboot requires a WebUSB Rockchip device');
       return;
     }
 
     try {
-      message.info('Rebooting device...');
+      messageApi.info('Sending reboot command to device...');
       await WebUSBRockchipFlasher.rebootDevice(selectedDevice as RockchipDevice);
-      message.success('Device reboot command sent successfully');
+      
+      // Show comprehensive success message
+      messageApi.success({
+        content: 'Device reboot command sent successfully!',
+        duration: 5,
+        style: { fontWeight: 'bold' }
+      });
+      
+      // Show detailed success notification
+      notification.success({
+        message: 'Device Reboot Initiated',
+        description: 'The reboot command has been sent to your device. It should start normally with the new bootloader or image.',
+        duration: 8,
+        placement: 'topRight'
+      });
       
       // Clear device selection since device will disconnect
       setTimeout(() => {
         setSelectedDevice(null);
         setRockchipDevices([]);
         setSerialDevices([]);
-        message.info('Device disconnected after reboot. Reconnect if needed.');
+        messageApi.info('Device disconnected after reboot. Reconnect if needed for further operations.');
       }, 2000);
     } catch (error) {
       console.error('Device reboot failed:', error);
-      message.error(`Device reboot failed: ${error instanceof Error ? error.message : String(error)}`);
+      messageApi.error(`Device reboot failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
@@ -1202,6 +1367,8 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
                           size="large"
                           icon={<DesktopOutlined />}
                           onClick={handleSPIBootloaderWrite}
+                          disabled={isFlashing}
+                          loading={isFlashing && spiOperationMode === 'spi-bootloader'}
                           style={{ 
                             height: '48px', 
                             fontSize: '16px',
@@ -1209,7 +1376,7 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
                             borderColor: colors.accent[500]
                           }}
                         >
-                          Write SPI Bootloader
+                          {isFlashing && spiOperationMode === 'spi-bootloader' ? 'Writing SPI Bootloader...' : 'Write SPI Bootloader'}
                         </Button>
                       )}
 
@@ -1230,7 +1397,7 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
                   <div>
                     {flashProgress && (
                       <div>
-                        <div style={{ marginBottom: '16px', textAlign: 'center' }}>
+                        <div style={{ marginBottom: '24px', textAlign: 'center' }}>
                           <Title level={4} style={{ color: colors.text.primary }}>
                             {flashProgress.phase === 'completed' ? 
                               (spiOperationMode === 'spi-clear' ? 'SPI Clear Completed!' :
@@ -1243,56 +1410,96 @@ export const HardwareFlashPanel: React.FC<HardwareFlashPanelProps> = ({ builds, 
                           </Title>
                         </div>
                         
-                        <Progress 
-                          percent={flashProgress.progress} 
-                          status={
-                            flashProgress.phase === 'completed' ? 'success' :
-                            flashProgress.phase === 'failed' ? 'exception' : 'active'
-                          }
-                          strokeColor={colors.accent[500]}
-                          style={{ marginBottom: '16px' }}
-                          size="default"
-                          showInfo={true}
-                        />
-                        
-                        <div style={{ 
-                          backgroundColor: colors.background.secondary, 
-                          padding: '12px', 
-                          borderRadius: '6px', 
-                          marginBottom: '16px' 
-                        }}>
-                          <Text style={{ color: colors.text.primary, fontWeight: 'bold' }}>
-                            Current Step: 
-                          </Text>
-                          <br />
-                          <Text style={{ color: colors.text.secondary }}>
-                            {flashProgress.message}
-                          </Text>
+                        {/* Compression Progress (if active) */}
+                        {compressionProgress && compressionProgress.progress > 0 && compressionProgress.progress < 100 && (
+                          <CompressionProgressBar
+                            progress={compressionProgress.progress}
+                            decompressedBytes={compressionProgress.decompressedBytes}
+                            speed={compressionProgress.speed}
+                            fileName={selectedImageFile}
+                          />
+                        )}
+
+                        {/* Enhanced Segmented Progress Bar */}
+                        <div style={{ marginBottom: '24px' }}>
+                          <SegmentedProgressBar
+                            currentPhase={flashProgress.phase}
+                            progress={flashProgress.progress}
+                            message={flashProgress.message}
+                            error={flashProgress.phase === 'failed'}
+                            variant={
+                              spiOperationMode === 'spi-clear' || spiOperationMode === 'spi-bootloader' ? 'spi' :
+                              flashMethod === 'browser' ? 'serial' : 'webusb'
+                            }
+                          />
                         </div>
                         
+                        {/* Data Transfer Info */}
                         {flashProgress.bytesTransferred && flashProgress.totalBytes && (
-                          <div style={{ marginBottom: '16px' }}>
-                            <Row justify="space-between">
+                          <div style={{ 
+                            backgroundColor: colors.background.secondary, 
+                            padding: '16px', 
+                            borderRadius: '8px', 
+                            marginBottom: '16px',
+                            border: `1px solid ${colors.border.light}`
+                          }}>
+                            <Row justify="space-between" align="middle">
                               <Col>
-                                <Text type="secondary">
-                                  Data transferred: {formatFileSize(flashProgress.bytesTransferred)} / {formatFileSize(flashProgress.totalBytes)}
-                                </Text>
+                                <Space direction="vertical" size={4}>
+                                  <Text style={{ color: colors.text.primary, fontWeight: 'bold' }}>
+                                    Data Transfer
+                                  </Text>
+                                  <Text type="secondary" style={{ fontSize: '14px' }}>
+                                    {formatFileSize(flashProgress.bytesTransferred)} of {formatFileSize(flashProgress.totalBytes)}
+                                  </Text>
+                                </Space>
                               </Col>
                               <Col>
-                                <Text type="secondary">
-                                  {Math.round((flashProgress.bytesTransferred / flashProgress.totalBytes) * 100)}% complete
-                                </Text>
+                                <div style={{ textAlign: 'right' }}>
+                                  <Text style={{ 
+                                    fontSize: '18px', 
+                                    fontWeight: 'bold',
+                                    color: colors.accent[500]
+                                  }}>
+                                    {Math.round((flashProgress.bytesTransferred / flashProgress.totalBytes) * 100)}%
+                                  </Text>
+                                  <br />
+                                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                                    transferred
+                                  </Text>
+                                </div>
                               </Col>
                             </Row>
                           </div>
                         )}
 
+                        {/* Completion Actions */}
                         {(flashProgress.phase === 'completed' || flashProgress.phase === 'failed') && (
-                          <div style={{ textAlign: 'center', marginTop: '24px' }}>
-                            <Button onClick={handleReset} type="primary">
-                              {spiOperationMode === 'spi-clear' ? 'Perform Another Operation' :
-                               spiOperationMode === 'spi-bootloader' ? 'Flash Another Bootloader' : 'Flash Another Image'}
-                            </Button>
+                          <div style={{ textAlign: 'center', marginTop: '32px' }}>
+                            <Space size="large">
+                              <Button 
+                                onClick={handleReset} 
+                                type="primary"
+                                size="large"
+                                style={{
+                                  backgroundColor: colors.accent[500],
+                                  borderColor: colors.accent[500]
+                                }}
+                              >
+                                {spiOperationMode === 'spi-clear' ? 'Perform Another Operation' :
+                                 spiOperationMode === 'spi-bootloader' ? 'Flash Another Bootloader' : 'Flash Another Image'}
+                              </Button>
+                              
+                              {flashProgress.phase === 'completed' && flashMethod === 'webusb' && selectedDevice && 'chipType' in selectedDevice && (
+                                <Button 
+                                  icon={<ReloadOutlined />}
+                                  onClick={handleDeviceReboot}
+                                  size="large"
+                                >
+                                  Reboot Device
+                                </Button>
+                              )}
+                            </Space>
                           </div>
                         )}
                       </div>

@@ -8,6 +8,7 @@ import http from 'http';
 import { createWriteStream, createReadStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import { createGunzip } from 'zlib';
+import { BootloaderService } from './bootloaderService.js';
 
 const execAsync = promisify(exec);
 
@@ -100,6 +101,7 @@ export class ArmbianBuilder {
   private armbianRepo: string;
   private demoMode: boolean;
   private downloadCache: string;
+  private bootloaderService: BootloaderService;
 
   constructor() {
     this.buildDir = process.env.BUILD_DIR || '/tmp/bbos-builds';
@@ -113,6 +115,7 @@ export class ArmbianBuilder {
     
     // Create cache directory
     this.initializeDirectories();
+    this.bootloaderService = new BootloaderService();
   }
 
   private async initializeDirectories(): Promise<void> {
@@ -495,6 +498,25 @@ echo "✅ BBOS customization completed"
         outputDir, 
         containerId
       );
+
+      // After successful build, collect bootloader files
+      if (artifacts.length > 0) {
+        console.log('🔍 Collecting bootloader files from build...');
+        
+        // Detect chip type from board configuration
+        const chipType = this.detectChipTypeFromBoard(configDir);
+        if (chipType) {
+          try {
+            await this.bootloaderService.collectBootloaderFromBuild(containerId, chipType);
+            console.log('✅ Bootloader files collected successfully');
+          } catch (error) {
+            console.warn('⚠️ Failed to collect bootloader files:', error);
+            // Don't fail the build if bootloader collection fails
+          }
+        } else {
+          console.warn('⚠️ Could not detect chip type for bootloader collection');
+        }
+      }
 
       onProgress({
         phase: 'completed',
@@ -1711,6 +1733,42 @@ WantedBy=multi-user.target
     } catch (error) {
       console.error('Cleanup failed:', error);
     }
+  }
+
+  // Detect chip type from board name
+  private detectChipTypeFromBoard(boardName: string): string | null {
+    const boardChipMap: Record<string, string> = {
+      // RK3588 boards
+      'rock-5b': 'RK3588',
+      'rock5b': 'RK3588',
+      'orangepi-5': 'RK3588',
+      'nanopc-t6': 'RK3588',
+      
+      // RK3566 boards  
+      'orangepi-3b': 'RK3566',
+      'quartz64a': 'RK3566',
+      'pine64-quartz64a': 'RK3566',
+      
+      // RK3399 boards
+      'rockpro64': 'RK3399',
+      'orangepi-4': 'RK3399',
+      'nanopc-t4': 'RK3399',
+      
+      // Add more mappings as needed
+    };
+
+    const normalizedBoard = boardName.toLowerCase().replace(/[-_]/g, '');
+    
+    for (const [pattern, chipType] of Object.entries(boardChipMap)) {
+      const normalizedPattern = pattern.toLowerCase().replace(/[-_]/g, '');
+      if (normalizedBoard.includes(normalizedPattern) || normalizedPattern.includes(normalizedBoard)) {
+        console.log(`🎯 Detected chip type ${chipType} for board ${boardName}`);
+        return chipType;
+      }
+    }
+    
+    console.warn(`⚠️ Unknown chip type for board: ${boardName}`);
+    return null;
   }
 }
 

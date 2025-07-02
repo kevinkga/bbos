@@ -22,6 +22,11 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true,
+    headers: {
+      // Enable WebUSB and Web Serial APIs
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Opener-Policy': 'same-origin'
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:3001',

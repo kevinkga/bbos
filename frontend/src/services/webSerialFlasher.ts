@@ -9,7 +9,8 @@ export interface SerialDevice {
 }
 
 export interface FlashProgressWeb {
-  phase: 'connecting' | 'preparing' | 'downloading' | 'flashing' | 'verifying' | 'completed' | 'failed';
+  phase: 'connecting' | 'preparing' | 'downloading' | 'flashing' | 'verifying' | 'completed' | 'failed' | 
+         'detecting' | 'loading_bootloader' | 'writing'; // Added WebUSB phases
   progress: number;
   message: string;
   bytesTransferred?: number;

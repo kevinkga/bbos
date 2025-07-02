@@ -17,6 +17,7 @@ import { colors } from '@/styles/design-tokens'
 import { useSocketService, BuildStatus } from '@/services/socketService'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ConnectionStatusCompact } from '@/components/ConnectionStatus'
+import { messageService } from '@/services/messageService'
 import WelcomePanel from '@/panels/WelcomePanel'
 import ArmbianConfigEditor from '@/panels/ArmbianConfigEditor'
 import BuildStatusPanel from '@/panels/BuildStatusPanel'
@@ -24,6 +25,7 @@ import FileExplorerPanel from '@/panels/FileExplorerPanel'
 import BuildsPanel from '@/panels/BuildsPanel'
 import BuildViewer from '@/panels/BuildViewer'
 import { HardwareFlashPanel } from '@/panels/HardwareFlashPanel'
+import { HardwareUtilitiesPanel } from '@/panels/HardwareUtilitiesPanel'
 import { ImageRunnerPanel } from '@/panels/ImageRunnerPanel'
 import 'flexlayout-react/style/light.css'
 import './App.css'
@@ -34,7 +36,7 @@ interface AppProps {
   theme?: 'light' | 'dark'
 }
 
-const App: React.FC<AppProps> = ({ theme = 'light' }) => {
+const AppContent: React.FC<AppProps> = ({ theme = 'light' }) => {
   const [model, setModel] = useState<Model | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [selectedConfig, setSelectedConfig] = useState<ArmbianConfiguration | null>(null)
@@ -58,6 +60,13 @@ const App: React.FC<AppProps> = ({ theme = 'light' }) => {
 
   // Socket.io integration for real-time communication
   const socketService = useSocketService()
+
+  // Initialize messageService with Antd message instance
+  const { message: messageApi } = AntdApp.useApp();
+  
+  useEffect(() => {
+    messageService.setMessageInstance(messageApi);
+  }, [messageApi]);
 
   // Initial data loading
   useEffect(() => {
@@ -563,6 +572,9 @@ const App: React.FC<AppProps> = ({ theme = 'light' }) => {
           />
         )
 
+      case 'HardwareUtilitiesPanel':
+        return <HardwareUtilitiesPanel />
+
       case 'ImageRunnerPanel':
         return (
           <ImageRunnerPanel
@@ -663,31 +675,6 @@ const App: React.FC<AppProps> = ({ theme = 'light' }) => {
   }
 
   return (
-    <ErrorBoundary
-      onError={(error, errorInfo) => {
-        console.error('🚨 App Error:', error, errorInfo);
-        // Could send to error reporting service here
-      }}
-    >
-      <StyleProvider>
-        <ConfigProvider
-          theme={{
-            token: {
-              colorPrimary: colors.accent[500],
-              colorSuccess: colors.success[500],
-              colorWarning: colors.warning[500],
-              colorError: colors.error[500],
-              fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              borderRadius: 6,
-              colorBgContainer: colors.background.primary,
-              colorBgLayout: colors.background.secondary,
-              colorBorder: colors.border.light,
-              colorText: colors.text.primary,
-              colorTextSecondary: colors.text.secondary
-            }
-          }}
-        >
-          <AntdApp>
           <div className="h-screen flex flex-col" style={{ backgroundColor: colors.background.secondary }}>
         {/* Top toolbar */}
         <div 
@@ -772,6 +759,38 @@ const App: React.FC<AppProps> = ({ theme = 'light' }) => {
           />
         </div>
         </div>
+  )
+}
+
+// Main App wrapper component with providers
+const App: React.FC<AppProps> = ({ theme = 'light' }) => {
+  return (
+    <ErrorBoundary
+      onError={(error, errorInfo) => {
+        console.error('🚨 App Error:', error, errorInfo);
+        // Could send to error reporting service here
+      }}
+    >
+      <StyleProvider>
+        <ConfigProvider
+          theme={{
+            token: {
+              colorPrimary: colors.accent[500],
+              colorSuccess: colors.success[500],
+              colorWarning: colors.warning[500],
+              colorError: colors.error[500],
+              fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              borderRadius: 6,
+              colorBgContainer: colors.background.primary,
+              colorBgLayout: colors.background.secondary,
+              colorBorder: colors.border.light,
+              colorText: colors.text.primary,
+              colorTextSecondary: colors.text.secondary
+            }
+          }}
+        >
+          <AntdApp>
+            <AppContent theme={theme} />
           </AntdApp>
         </ConfigProvider>
       </StyleProvider>

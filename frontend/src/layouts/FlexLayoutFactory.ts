@@ -262,6 +262,14 @@ export class FlexLayoutFactory {
             },
             {
               type: 'tab',
+              id: 'hardware-utilities',
+              name: 'Hardware Utilities',
+              component: 'HardwareUtilitiesPanel',
+              enableClose: false,
+              icon: 'tool',
+            },
+            {
+              type: 'tab',
               id: 'terminal',
               name: 'Terminal',
               component: 'TerminalPanel',
