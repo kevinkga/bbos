@@ -36,7 +36,7 @@
         },
         "name": {
           "type": "string",
-          "description": "Specific board name (e.g., 'rock-5b', 'orangepi5')"
+          "description": "Specific board name (e.g., 'rock-5b', 'rock-5b-plus', 'orangepi5')"
         },
         "architecture": {
           "type": "string",

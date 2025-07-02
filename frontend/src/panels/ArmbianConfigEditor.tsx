@@ -242,7 +242,7 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
               name: {
                 type: 'string',
                 title: 'Board Name',
-                description: 'Specific board model (e.g., rock-5b, orangepi5)'
+                description: 'Specific board model (e.g., rock-5b, rock-5b-plus, orangepi5)'
               },
               architecture: {
                 type: 'string',
@@ -261,7 +261,7 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
           'ui:title': '🔧 Hardware Configuration',
           'ui:description': 'Select your target hardware platform carefully - this affects all other options',
           name: {
-            'ui:placeholder': 'e.g., rock-5b, orangepi5, nanopi-m4',
+            'ui:placeholder': 'e.g., rock-5b, rock-5b-plus, orangepi5, nanopi-m4',
             'ui:help': 'Check Armbian documentation for supported board names'
           }
         }
@@ -556,7 +556,7 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
           name: {
             type: 'string',
             title: 'Board Name',
-            description: 'Specific board model (e.g., rock-5b, orangepi5)'
+            description: 'Specific board model (e.g., rock-5b, rock-5b-plus, orangepi5)'
           },
           architecture: {
             type: 'string',
@@ -729,7 +729,7 @@ const ArmbianConfigEditor: React.FC<ArmbianConfigEditorProps> = ({
       'ui:title': '🔧 Board Configuration',
       'ui:description': 'Select your target hardware platform',
       name: {
-        'ui:placeholder': 'e.g., rock-5b, orangepi5, nanopi-m4'
+                    'ui:placeholder': 'e.g., rock-5b, rock-5b-plus, orangepi5, nanopi-m4'
       }
     },
     distribution: {

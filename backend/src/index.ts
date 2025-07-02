@@ -10,6 +10,8 @@ import dotenv from 'dotenv';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs/promises';
+import * as fsSync from 'fs';
+import * as zlib from 'zlib';
 import { ArmbianBuilder, ArmbianConfiguration } from './services/armbianBuilder.js';
 import { BuildTracker, BuildJob } from './services/buildTracker.js';
 import { HardwareFlasher, FlashProgress } from './services/hardwareFlasher.js';
@@ -66,7 +68,19 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // Compression and logging
-app.use(compression());
+app.use(compression({
+  // Use compression level 6 for good balance of speed/compression
+  level: 6,
+  // Only compress files larger than 1KB
+  threshold: 1024,
+  // Allow disabling compression with header
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  }
+}));
 app.use(morgan(NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 // Body parsing middleware
@@ -272,22 +286,174 @@ app.get('/api/hardware/capabilities', async (req: express.Request, res: express.
   }
 });
 
+// Device detection control endpoint
+app.put('/api/hardware/device-detection', (req: express.Request, res: express.Response) => {
+  try {
+    const { enabled } = req.body;
+    
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ error: 'enabled must be a boolean value' });
+    }
+    
+    hardwareFlasher.setDeviceDetectionEnabled(enabled);
+    
+    res.json({ 
+      message: `Device detection ${enabled ? 'enabled' : 'disabled'}`,
+      enabled,
+      reason: enabled ? 'Backend device detection active' : 'Disabled to prevent Web Serial conflicts'
+    });
+  } catch (error) {
+    console.error('❌ Failed to control device detection:', error);
+    res.status(500).json({ error: 'Failed to control device detection' });
+  }
+});
+
 app.get('/api/hardware/devices', async (req: express.Request, res: express.Response) => {
   try {
-    const devices = await hardwareFlasher.detectDevices();
-    res.json({ devices });
+    const force = req.query.force === 'true';
+    const devices = await hardwareFlasher.detectDevices(force);
+    res.json({ 
+      devices,
+      force,
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
     console.error('❌ Failed to detect devices:', error);
     res.status(500).json({ error: 'Failed to detect devices' });
   }
 });
 
+app.get('/api/hardware/devices/:deviceId/storage', async (req: express.Request, res: express.Response) => {
+  try {
+    const { deviceId } = req.params;
+    
+    // First ensure the device exists
+    const devices = await hardwareFlasher.detectDevices();
+    const device = devices.find(d => d.id === deviceId);
+    
+    if (!device) {
+      return res.status(404).json({ error: 'Device not found or not in proper mode for storage detection' });
+    }
+
+    if (device.type === 'maskrom') {
+      return res.status(400).json({ 
+        error: 'Device is in maskrom mode. Load bootloader first to detect storage.',
+        suggestion: 'Use rkdeveloptool db <loader.bin> to load bootloader, then retry storage detection.'
+      });
+    }
+
+    // Detect available storage with detailed information
+    const storageDevices = await hardwareFlasher.detectStorageDevices(deviceId);
+    const availableDevices = storageDevices.filter(d => d.available);
+    const recommended = storageDevices.find(d => d.recommended && d.available);
+    
+    res.json({
+      deviceId,
+      devices: storageDevices,
+      timestamp: new Date().toISOString(),
+      recommendations: {
+        primary: recommended?.type || (availableDevices.length > 0 ? availableDevices[0].type : null),
+        warning: availableDevices.length === 0 ? 'No storage detected! Please insert SD card or check eMMC connection.' : null
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Failed to detect storage:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// Stream compressed images endpoint
+app.get('/api/builds/:buildId/artifacts/:artifactName/compressed', async (req: express.Request, res: express.Response) => {
+  try {
+    const { buildId, artifactName } = req.params;
+    
+    // Get the build job
+    const buildJob = buildTracker.getBuild(buildId);
+    if (!buildJob) {
+      return res.status(404).json({ error: 'Build job not found' });
+    }
+
+    // Find the requested artifact
+    const artifact = buildJob.artifacts?.find(a => a.name === artifactName);
+    if (!artifact) {
+      return res.status(404).json({ error: 'Artifact not found' });
+    }
+
+    const artifactPath = artifact.path;
+    
+    // Check if the artifact file exists
+    try {
+      await fs.access(artifactPath);
+    } catch (error) {
+      return res.status(404).json({ error: 'Artifact file not found on disk' });
+    }
+
+    // Set appropriate headers for streaming compressed content
+    res.setHeader('Content-Type', 'application/gzip');
+    // Note: Don't set Content-Encoding: gzip as it causes browser auto-decompression
+    res.setHeader('Content-Disposition', `attachment; filename="${artifactName}.gz"`);
+    res.setHeader('Transfer-Encoding', 'chunked');
+    
+    // Stream the file through gzip compression
+    const readStream = fsSync.createReadStream(artifactPath);
+    const gzip = zlib.createGzip({ level: 6 }); // Good compression/speed balance
+    
+    // Track progress for large files
+    const stats = await fs.stat(artifactPath);
+    let bytesRead = 0;
+    
+    readStream.on('data', (chunk: Buffer) => {
+      bytesRead += chunk.length;
+      // Emit progress updates via Socket.IO if needed
+      const progress = (bytesRead / stats.size) * 100;
+      io.emit('compression:progress', {
+        buildId,
+        artifactName,
+        progress: Math.round(progress),
+        bytesRead,
+        totalBytes: stats.size
+      });
+    });
+
+    // Handle errors
+    readStream.on('error', (error: Error) => {
+      console.error(`❌ Error reading artifact ${artifactName}:`, error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Failed to read artifact file' });
+      }
+    });
+
+    gzip.on('error', (error: Error) => {
+      console.error(`❌ Error compressing artifact ${artifactName}:`, error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Failed to compress artifact' });
+      }
+    });
+
+    // Pipe the file through gzip to the response
+    readStream.pipe(gzip).pipe(res);
+    
+    console.log(`📦 Streaming compressed artifact: ${artifactName} (${(stats.size / 1024 / 1024).toFixed(1)} MB)`);
+    
+  } catch (error) {
+    console.error('❌ Failed to stream compressed artifact:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: (error as Error).message });
+    }
+  }
+});
+
 app.post('/api/hardware/flash', async (req: express.Request, res: express.Response) => {
   try {
-    const { buildId, deviceId } = req.body;
+    const { buildId, deviceId, storageTarget = 'emmc' } = req.body;
     
     if (!buildId || !deviceId) {
       return res.status(400).json({ error: 'buildId and deviceId are required' });
+    }
+
+    if (!['emmc', 'sd', 'spinor'].includes(storageTarget)) {
+      return res.status(400).json({ error: 'storageTarget must be one of: emmc, sd, spinor' });
     }
 
     // Get the build job to find the image path
@@ -302,7 +468,7 @@ app.post('/api/hardware/flash', async (req: express.Request, res: express.Respon
       return res.status(404).json({ error: 'No image artifact found for this build' });
     }
 
-    console.log(`🔥 Flash request: Build ${buildId} → Device ${deviceId}`);
+    console.log(`🔥 Flash request: Build ${buildId} → Device ${deviceId} (${storageTarget.toUpperCase()})`);
 
     // Start flashing process
     const flashJobId = await hardwareFlasher.flashImage(
@@ -315,9 +481,11 @@ app.post('/api/hardware/flash', async (req: express.Request, res: express.Respon
           flashJobId,
           buildId,
           deviceId,
+          storageTarget,
           ...progress
         });
-      }
+      },
+      storageTarget as 'emmc' | 'sd' | 'spinor'
     );
 
     res.status(201).json({
@@ -325,7 +493,8 @@ app.post('/api/hardware/flash', async (req: express.Request, res: express.Respon
       flashJobId,
       buildId,
       deviceId,
-      imagePath: imageArtifact.path
+      imagePath: imageArtifact.path,
+      storageTarget
     });
 
   } catch (error) {
@@ -481,16 +650,36 @@ io.on('connection', (socket) => {
   });
 
   // Hardware flashing event handlers
-  socket.on('hardware:detect', async () => {
+  socket.on('hardware:detect', async (data: { force?: boolean } = {}) => {
     try {
-      const devices = await hardwareFlasher.detectDevices();
+      const force = data.force || false;
+      const devices = await hardwareFlasher.detectDevices(force);
       socket.emit('hardware:devices', {
         devices,
+        force,
         timestamp: new Date().toISOString()
       });
     } catch (error) {
       socket.emit('hardware:error', {
         error: 'Failed to detect devices',
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
+  // Device detection control via WebSocket
+  socket.on('hardware:set-detection', (data: { enabled: boolean }) => {
+    try {
+      const { enabled } = data;
+      hardwareFlasher.setDeviceDetectionEnabled(enabled);
+      socket.emit('hardware:detection-changed', {
+        enabled,
+        message: `Device detection ${enabled ? 'enabled' : 'disabled'}`,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      socket.emit('hardware:error', {
+        error: 'Failed to control device detection',
         timestamp: new Date().toISOString()
       });
     }

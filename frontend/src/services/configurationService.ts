@@ -260,6 +260,49 @@ echo "dtparam=spi=on" >> /boot/config.txt
           swapSize: 4096
         }
       }
+    },
+    {
+      id: 'rock5b-plus-server',
+      name: 'Rock 5B+ Server',
+      description: 'High-performance server configuration for Rock 5B+',
+      category: 'server',
+      tags: ['rock5b+', 'server', 'performance', 'rk3588'],
+      difficulty: 'intermediate',
+      author: 'BBOS Team',
+      createdAt: new Date().toISOString(),
+      configuration: {
+        name: 'Rock 5B+ Server Configuration',
+        description: 'Optimized server setup for Rock 5B+ with enhanced performance settings',
+        board: {
+          family: 'rk35xx',
+          name: 'rock-5b-plus',
+          architecture: 'arm64'
+        },
+        distribution: {
+          release: 'bookworm',
+          type: 'server'
+        },
+        ssh: {
+          enabled: true,
+          port: 22,
+          passwordAuth: false,
+          rootLogin: false,
+          keyTypes: ['ed25519']
+        },
+        packages: {
+          install: ['docker.io', 'docker-compose', 'nginx', 'certbot', 'htop', 'iotop', 'stress-ng']
+        },
+        network: {
+          hostname: 'rock5b-plus-server',
+          ethernet: {
+            dhcp: true
+          }
+        },
+        storage: {
+          filesystem: 'ext4',
+          swapSize: 2048
+        }
+      }
     }
   ]
 

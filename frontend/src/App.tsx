@@ -23,6 +23,7 @@ import BuildStatusPanel from '@/panels/BuildStatusPanel'
 import FileExplorerPanel from '@/panels/FileExplorerPanel'
 import BuildsPanel from '@/panels/BuildsPanel'
 import BuildViewer from '@/panels/BuildViewer'
+import { HardwareFlashPanel } from '@/panels/HardwareFlashPanel'
 import 'flexlayout-react/style/light.css'
 import './App.css'
 
@@ -529,6 +530,34 @@ const App: React.FC<AppProps> = ({ theme = 'light' }) => {
             onViewArtifact={(buildId: string, artifactName: string) => {
               console.log('View artifact:', { buildId, artifactName })
               // TODO: Implement artifact viewer
+            }}
+          />
+        )
+
+      case 'HardwareFlashPanel':
+        return (
+          <HardwareFlashPanel
+            builds={buildJobs.map(job => {
+              const imageArtifact = job.artifacts.find(a => a.type === 'image');
+              return {
+                id: job.id,
+                name: `Build ${new Date(job.createdAt).toLocaleTimeString().slice(0, 8)}`,
+                status: job.status,
+                outputPath: imageArtifact ? `/api/builds/${job.id}/artifacts/${encodeURIComponent(imageArtifact.name)}` : undefined,
+                size: imageArtifact?.size,
+                createdAt: job.createdAt,
+                artifacts: job.artifacts.map(artifact => ({
+                  name: artifact.name,
+                  type: artifact.type,
+                  size: artifact.size,
+                  url: `/api/builds/${job.id}/artifacts/${encodeURIComponent(artifact.name)}`
+                }))
+              };
+            })}
+            onRefresh={() => {
+              console.log('Refreshing builds for hardware flashing...')
+              // Send request for latest builds
+              socketService.send('build:refresh')
             }}
           />
         )

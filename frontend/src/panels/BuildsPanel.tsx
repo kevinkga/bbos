@@ -15,7 +15,8 @@ import {
   Empty,
   Progress,
   List,
-  Divider
+  Divider,
+  Drawer
 } from 'antd'
 import { 
   BuildOutlined,
@@ -38,13 +39,15 @@ import {
   SettingOutlined,
   CalendarOutlined,
   CloudDownloadOutlined,
-  DeleteOutlined
+  DeleteOutlined,
+  ThunderboltOutlined
 } from '@ant-design/icons'
 import type { DataNode, TreeProps } from 'antd/es/tree'
 import type { MenuProps } from 'antd'
 import { BuildJob, BuildArtifact, ArmbianConfiguration } from '@/types'
 import { useAppStore } from '@/stores/app'
 import { colors, components, spacing } from '@/styles/design-tokens'
+import { HardwareFlashPanel } from './HardwareFlashPanel'
 
 const { Title, Text } = Typography
 const { confirm } = Modal
@@ -66,6 +69,7 @@ interface BuildsPanelProps {
   onArtifactDownload?: (buildId: string, artifactName: string) => void
   onViewLogs?: (buildId: string) => void
   onCancelBuild?: (buildId: string) => void
+  onImageFlash?: (buildId: string, imageName: string) => void
   selectedBuildId?: string
 }
 
@@ -75,6 +79,7 @@ export const BuildsPanel: React.FC<BuildsPanelProps> = ({
   onArtifactDownload,
   onViewLogs,
   onCancelBuild,
+  onImageFlash,
   selectedBuildId
 }) => {
   const { message } = App.useApp()
@@ -86,6 +91,8 @@ export const BuildsPanel: React.FC<BuildsPanelProps> = ({
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 })
   const [selectedNode, setSelectedNode] = useState<BuildNode | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
+  const [flashDrawerVisible, setFlashDrawerVisible] = useState(false)
+  const [flashBuildId, setFlashBuildId] = useState<string>('')
 
   // Store integration
   const { buildJobs, configurations } = useAppStore()
@@ -172,15 +179,15 @@ export const BuildsPanel: React.FC<BuildsPanelProps> = ({
         // Group builds by date
         const buildsByDate: { [date: string]: BuildJob[] } = {}
         
-        buildJobs
-          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-          .forEach(build => {
-            const date = new Date(build.createdAt).toDateString()
-            if (!buildsByDate[date]) {
-              buildsByDate[date] = []
-            }
-            buildsByDate[date].push(build)
-          })
+        const sortedBuilds = [...buildJobs].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        
+        sortedBuilds.forEach(build => {
+          const date = new Date(build.createdAt).toDateString()
+          if (!buildsByDate[date]) {
+            buildsByDate[date] = []
+          }
+          buildsByDate[date].push(build)
+        })
 
                  const dateNodes: BuildNode[] = Object.entries(buildsByDate).map(([date, builds]) => {
            const buildNodes: BuildNode[] = builds.map(build => {
@@ -189,26 +196,41 @@ export const BuildsPanel: React.FC<BuildsPanelProps> = ({
             const config = configurations.find(c => c.id === build.configurationId)
             
             // Create artifact nodes
-            const artifactNodes: BuildNode[] = (build.artifacts || []).map(artifact => ({
-              id: `${build.id}-artifact-${artifact.name}`,
-              key: `${build.id}-artifact-${artifact.name}`,
-              title: (
-                <Space>
-                  <span>{artifact.name}</span>
-                  <Text type="secondary" style={{ fontSize: '11px' }}>
-                    {formatFileSize(artifact.size)}
-                  </Text>
-                </Space>
-              ),
-              type: 'artifact',
-              icon: getArtifactIcon(artifact.type),
-              content: artifact,
-              size: artifact.size,
-              parentBuildId: build.id,
-              artifactType: artifact.type,
-              downloadUrl: artifact.url,
-              isLeaf: true
-            }))
+            const artifactNodes: BuildNode[] = (build.artifacts || []).map(artifact => {
+              const isImageArtifact = artifact.type === 'image'
+              const isFromCompletedBuild = build.status === 'completed'
+              const canFlash = isImageArtifact && isFromCompletedBuild
+              
+              return {
+                id: `${build.id}-artifact-${artifact.name}`,
+                key: `${build.id}-artifact-${artifact.name}`,
+                title: (
+                  <Tooltip 
+                    title={canFlash ? "Double-click to flash to hardware" : artifact.name}
+                    placement="right"
+                  >
+                    <Space style={{ 
+                      cursor: canFlash ? 'pointer' : 'default',
+                      color: canFlash ? colors.accent[400] : 'inherit'
+                    }}>
+                      <span>{artifact.name}</span>
+                      {canFlash && <ThunderboltOutlined style={{ fontSize: '10px', color: colors.accent[500] }} />}
+                      <Text type="secondary" style={{ fontSize: '11px' }}>
+                        {formatFileSize(artifact.size)}
+                      </Text>
+                    </Space>
+                  </Tooltip>
+                ),
+                type: 'artifact',
+                icon: getArtifactIcon(artifact.type),
+                content: artifact,
+                size: artifact.size,
+                parentBuildId: build.id,
+                artifactType: artifact.type,
+                downloadUrl: artifact.url,
+                isLeaf: true
+              }
+            })
 
             // Add configuration node if available
             const configNode: BuildNode[] = config ? [{
@@ -419,12 +441,20 @@ export const BuildsPanel: React.FC<BuildsPanelProps> = ({
         ]
 
       case 'artifact':
+        const isImageArtifact = node.artifactType === 'image'
+        const isFromCompletedBuild = node.parentBuildId && buildJobs.find(b => b.id === node.parentBuildId)?.status === 'completed'
+        
         return [
           {
             key: 'download',
             label: 'Download',
             icon: <DownloadOutlined />
           },
+          ...(isImageArtifact && isFromCompletedBuild ? [{
+            key: 'flash-hardware',
+            label: 'Flash to Hardware',
+            icon: <ThunderboltOutlined />
+          }] : []),
           ...baseItems
         ]
 
@@ -476,6 +506,13 @@ export const BuildsPanel: React.FC<BuildsPanelProps> = ({
         if (node.type === 'artifact' && node.parentBuildId && node.content) {
           const artifact = node.content as BuildArtifact
           onArtifactDownload?.(node.parentBuildId, artifact.name)
+        }
+        break
+        
+      case 'flash-hardware':
+        if (node.type === 'artifact' && node.parentBuildId && node.content && node.artifactType === 'image') {
+          setFlashBuildId(node.parentBuildId)
+          setFlashDrawerVisible(true)
         }
         break
         
@@ -627,6 +664,15 @@ export const BuildsPanel: React.FC<BuildsPanelProps> = ({
               const buildNode = node as BuildNode
               if (buildNode.type === 'build' && buildNode.buildJob && onBuildDoubleClick) {
                 onBuildDoubleClick(buildNode.buildJob)
+              } else if (buildNode.type === 'artifact' && buildNode.artifactType === 'image' && buildNode.parentBuildId) {
+                // Double-click on image artifact opens flash interface
+                const build = buildJobs.find(b => b.id === buildNode.parentBuildId)
+                if (build?.status === 'completed') {
+                  setFlashBuildId(buildNode.parentBuildId)
+                  setFlashDrawerVisible(true)
+                } else {
+                  message.warning('Image can only be flashed from completed builds')
+                }
               }
             }}
             onRightClick={({ event, node }) => {
@@ -674,6 +720,43 @@ export const BuildsPanel: React.FC<BuildsPanelProps> = ({
           />
         </Dropdown>
       )}
+
+      {/* Hardware Flash Drawer */}
+      <Drawer
+        title={
+          <Space>
+            <ThunderboltOutlined />
+            Flash Image to Hardware
+          </Space>
+        }
+        placement="right"
+        size="large"
+        open={flashDrawerVisible}
+        onClose={() => setFlashDrawerVisible(false)}
+        destroyOnClose
+        styles={{
+          body: { padding: 0 }
+        }}
+      >
+        {flashBuildId && (
+          <HardwareFlashPanel
+            builds={buildJobs
+              .filter(b => b.id === flashBuildId)
+              .map(buildJob => ({
+                id: buildJob.id,
+                name: buildJob.configurationSnapshot?.name || `Build ${new Date(buildJob.createdAt).toLocaleTimeString()}`,
+                status: buildJob.status,
+                outputPath: buildJob.artifacts?.find(a => a.type === 'image')?.url,
+                size: buildJob.artifacts?.find(a => a.type === 'image')?.size
+              }))
+            }
+            onRefresh={() => {
+              // TODO: Refresh builds data
+              console.log('Refreshing build data...')
+            }}
+          />
+        )}
+      </Drawer>
     </div>
   )
 }

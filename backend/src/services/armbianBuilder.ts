@@ -167,10 +167,42 @@ export class ArmbianBuilder {
   }
 
   /**
+   * Create a new Docker container for the build and return its ID
+   */
+  async createBuildContainer(config: ArmbianConfiguration): Promise<string> {
+    const containerName = `bbos-build-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    try {
+      // Create Docker container for the build
+      const { stdout: containerId } = await execAsync(`
+        docker create \\
+          --name ${containerName} \\
+          --privileged \\
+          --volume ${this.buildDir}:/builds \\
+          --volume ${this.downloadCache}:/cache \\
+          --workdir /builds \\
+          ubuntu:22.04 \\
+          sleep infinity
+      `);
+      
+      const cleanContainerId = containerId.trim();
+      console.log(`🐳 Created build container: ${cleanContainerId} (${containerName})`);
+      
+      // Start the container
+      await execAsync(`docker start ${cleanContainerId}`);
+      
+      return cleanContainerId;
+    } catch (error) {
+      console.error('Failed to create build container:', error);
+      throw new Error(`Failed to create build container: ${error}`);
+    }
+  }
+
+  /**
    * Generate Armbian build configuration files from JSON config
    */
-  async generateBuildConfig(config: ArmbianConfiguration, buildId: string): Promise<string> {
-    const configDir = path.join(this.buildDir, buildId);
+  async generateBuildConfig(config: ArmbianConfiguration, containerId: string): Promise<string> {
+    const configDir = path.join(this.buildDir, containerId);
     await fs.mkdir(configDir, { recursive: true });
 
     // Generate userpatches directory structure
@@ -427,8 +459,8 @@ echo "✅ BBOS customization completed"
   /**
    * Execute build using Armbian's recommended approach
    */
-  async executeBuild(configDir: string, buildId: string, onProgress: (progress: BuildProgress) => void): Promise<BuildArtifact[]> {
-    const outputDir = path.join(this.buildDir, buildId, 'output');
+  async executeBuild(configDir: string, containerId: string, onProgress: (progress: BuildProgress) => void): Promise<BuildArtifact[]> {
+    const outputDir = path.join(this.buildDir, containerId, 'output');
     await fs.mkdir(outputDir, { recursive: true });
 
     try {
@@ -453,7 +485,7 @@ echo "✅ BBOS customization completed"
         baseImagePath, 
         configDir, 
         outputDir, 
-        buildId, 
+        containerId, 
         onProgress
       );
 
@@ -461,7 +493,7 @@ echo "✅ BBOS customization completed"
       const artifacts = await this.generateConfiguredArtifacts(
         configuredImagePath, 
         outputDir, 
-        buildId
+        containerId
       );
 
       onProgress({

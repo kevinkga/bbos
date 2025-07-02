@@ -216,10 +216,18 @@ export class FlexLayoutFactory {
         {
           type: 'border',
           location: 'bottom',
-          size: 300,
+          size: 350,
           selected: 0,
-          show: false,
+          show: true,
           children: [
+            {
+              type: 'tab',
+              id: 'hardware-flash',
+              name: 'Flash Image to Hardware',
+              component: 'HardwareFlashPanel',
+              enableClose: false,
+              icon: 'thunderbolt',
+            },
             {
               type: 'tab',
               id: 'terminal',

@@ -44,6 +44,8 @@ BBOS is a cloud-based IoT platform with core objectives:
 - 🔄 **Real-time Updates**: WebSocket communication for build status
 - 💾 **State Persistence**: Layout and configuration persistence
 - ↩️ **Undo/Redo**: Full action history management
+- ⚡ **Intuitive Hardware Flashing**: Double-click image files to flash directly to hardware
+- 🌐 **Browser-Based Flashing**: Web Serial API support for direct device communication
 
 ## Project Structure
 
@@ -101,6 +103,37 @@ BBOS supports two build modes:
 ### Current Status
 
 If you're seeing small "image" files (~1-2KB), you're in **Demo Mode**. The build button IS working correctly - it's just creating mock files for development. To get real Armbian images, switch to Production Mode as shown above.
+
+## Hardware Flashing
+
+BBOS makes flashing Armbian images to hardware incredibly intuitive:
+
+### Quick Start
+1. **Complete a build** - Ensure your Armbian configuration build finishes successfully
+2. **Find the image** - Navigate to your completed build in the Builds panel
+3. **Double-click to flash** - Simply double-click any `.img` file with the ⚡ icon
+4. **Choose method** - Select backend (rkdeveloptool) or browser (Web Serial API)
+5. **Connect device** - Put your Rockchip board in maskrom mode and connect via USB-C
+
+### Supported Methods
+
+#### Backend Method (Recommended)
+- Uses `rkdeveloptool` for proven reliability
+- Supports all Rockchip devices (RK3588, RK3399, RK3566, etc.)
+- Automatic device detection and mode switching
+- Real-time progress via WebSocket
+
+#### Browser Method (Experimental)
+- Direct hardware communication from your browser
+- No backend dependencies required
+- Works with Chrome/Edge/Opera (Web Serial API)
+- Perfect for remote or cloud deployments
+
+### Visual Cues
+- **⚡ Icon**: Indicates flashable image files
+- **Tooltip**: Hover for flashing instructions
+- **Context Menu**: Right-click for additional options
+- **Color Highlighting**: Flashable images appear in accent color
 
 ## Environment Variables
 
