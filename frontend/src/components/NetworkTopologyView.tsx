@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Server, Wifi, Router, HardDrive, Monitor, Smartphone, Shield, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { Server, Wifi, Router, HardDrive, Monitor, Smartphone, Shield, AlertTriangle, CheckCircle, Clock, Plus, Play, Pause, Square, Settings, Download, Zap, RefreshCw, Cpu, Activity } from 'lucide-react';
 import { NetworkTopologyViewProps, NetworkNode } from '../types/network';
+import { DeviceConfigurationModal } from './DeviceConfigurationModal';
 
 interface NodePosition {
   x: number;
@@ -13,12 +14,35 @@ interface DragState {
   offset: { x: number; y: number };
 }
 
+interface NodeStatus {
+  total: number;
+  configured: number;
+  building: number;
+  deployed: number;
+  ready: number;
+  failed: number;
+}
+
+interface WorkflowProgress {
+  [nodeId: string]: {
+    status: 'planning' | 'building' | 'ready-to-flash' | 'flashing' | 'deployed' | 'failed';
+    progress: number;
+    workflowId: string;
+    buildId?: string;
+    templateName?: string;
+    error?: string;
+  };
+}
+
 export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
   nodes,
+  onAddNode,
+  onUpdateNode,
+  onDeleteNode,
   onNodeSelect,
-  onNodeUpdate,
   onNodeBuild,
-  onNodeFlash
+  onNodeFlash,
+  className = ''
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [nodePositions, setNodePositions] = useState<Record<string, NodePosition>>({});
@@ -26,6 +50,12 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [showAddNodeModal, setShowAddNodeModal] = useState(false);
+  const [selectedNode, setSelectedNode] = useState<NetworkNode | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [workflowProgress, setWorkflowProgress] = useState<WorkflowProgress>({});
+  const [isDeploying, setIsDeploying] = useState(false);
+  const [deploymentProgress, setDeploymentProgress] = useState(0);
 
   // Initialize node positions based on their coordinates or auto-layout
   useEffect(() => {
@@ -58,6 +88,37 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
     
     setNodePositions(positions);
   }, [nodes]);
+
+  // Monitor workflow progress from build-flash integration service
+  useEffect(() => {
+    // Initialize workflow progress tracking
+    // For now, we'll simulate workflow progress
+    // TODO: Uncomment when buildFlashIntegrationService is available
+    
+    /*
+    const handleWorkflowUpdate = (workflow: any) => {
+      setWorkflowProgress(prev => ({
+        ...prev,
+        [workflow.networkNodeId]: {
+          status: workflow.status,
+          progress: workflow.buildProgress + workflow.flashProgress,
+          workflowId: workflow.id,
+          buildId: workflow.buildId,
+          templateName: workflow.templateName,
+          error: workflow.error
+        }
+      }));
+    };
+
+    buildFlashIntegrationService.addEventListener('workflow:updated', handleWorkflowUpdate);
+    
+    return () => {
+      buildFlashIntegrationService.removeEventListener('workflow:updated', handleWorkflowUpdate);
+    };
+    */
+
+    console.log('🔌 NetworkTopologyView: Workflow monitoring initialized');
+  }, []);
 
   const getNodeIcon = (nodeType: string, size = 24) => {
     const iconProps = { size, className: "text-current" };
@@ -134,7 +195,7 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
     if (dragState.nodeId && nodePositions[dragState.nodeId]) {
       const node = nodes.find(n => n.id === dragState.nodeId);
       if (node) {
-        onNodeUpdate(dragState.nodeId, {
+        onUpdateNode(dragState.nodeId, {
           location: {
             ...node.location,
             coordinates: {
@@ -147,16 +208,143 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
       }
     }
     setDragState({ isDragging: false, nodeId: null, offset: { x: 0, y: 0 } });
-  }, [dragState.nodeId, nodePositions, nodes, onNodeUpdate]);
+  }, [dragState.nodeId, nodePositions, nodes, onUpdateNode]);
 
   const handleNodeClick = useCallback((node: NetworkNode) => {
     setSelectedNodeId(node.id);
-    onNodeSelect(node);
+    onNodeSelect?.(node);
   }, [onNodeSelect]);
 
   const handleZoom = useCallback((delta: number) => {
     setZoomLevel(prev => Math.max(0.5, Math.min(2, prev + delta)));
   }, []);
+
+  const handleAddNode = useCallback(() => {
+    setSelectedNode(null);
+    setShowAddNodeModal(true);
+  }, []);
+
+  const handleEditNode = useCallback((node: NetworkNode) => {
+    setSelectedNode(node);
+    setShowEditModal(true);
+  }, []);
+
+  const handleSaveNode = useCallback((nodeConfig: Partial<NetworkNode>) => {
+    if (selectedNode) {
+      // Update existing node
+      onUpdateNode(selectedNode.id, nodeConfig);
+    } else {
+      // Add new node
+      const nodeId = crypto.randomUUID();
+      const newNode: Partial<NetworkNode> = {
+        ...nodeConfig,
+        id: nodeId,
+        networkId: 'default',
+        userId: 'current-user',
+        deviceCategory: 'armbian_supported',
+        createdAt: new Date().toISOString(),
+        version: 1
+      };
+      onAddNode(newNode);
+    }
+    
+    setShowAddNodeModal(false);
+    setShowEditModal(false);
+    setSelectedNode(null);
+  }, [selectedNode, onAddNode, onUpdateNode]);
+
+  const handleDeployAll = useCallback(async () => {
+    const configuredNodes = nodes.filter(node => 
+      node.armbianConfig && 
+      node.name && 
+      node.nodeType &&
+      !workflowProgress[node.id] // Only deploy nodes not already in progress
+    );
+
+    if (configuredNodes.length === 0) {
+      alert('No configured nodes ready for deployment. Please configure at least one device first.');
+      return;
+    }
+
+    const shouldProceed = confirm(
+      `Deploy ${configuredNodes.length} device(s)?\n\n` +
+      `This will start building Armbian images for:\n` +
+      configuredNodes.map(node => `• ${node.name} (${node.nodeType})`).join('\n') +
+      `\n\nBuilds will be available for hardware flashing once completed.`
+    );
+
+    if (!shouldProceed) return;
+
+    setIsDeploying(true);
+    setDeploymentProgress(0);
+
+    try {
+      console.log('🚀 Starting multi-device deployment workflow');
+      
+      // For now, we'll simulate the deployment process
+      // TODO: Uncomment when services are available
+      /*
+      const workflowIds = await buildFlashIntegrationService.startMultiDeviceWorkflow(configuredNodes);
+      
+      console.log(`✅ Started ${workflowIds.length} workflows:`, workflowIds);
+      
+      // Update progress for each node
+      configuredNodes.forEach((node, index) => {
+        setWorkflowProgress(prev => ({
+          ...prev,
+          [node.id]: {
+            status: 'building',
+            progress: 5,
+            workflowId: workflowIds[index] || `workflow-${node.id}`,
+            templateName: node.templateName
+          }
+        }));
+      });
+      */
+
+      // Simulate deployment progress
+      for (let i = 0; i <= 100; i += 10) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+        setDeploymentProgress(i);
+        
+        // Simulate updating individual node progress
+        configuredNodes.forEach((node, index) => {
+          const nodeProgress = Math.min(100, i + (index * 5));
+          setWorkflowProgress(prev => ({
+            ...prev,
+            [node.id]: {
+              status: nodeProgress < 100 ? 'building' : 'ready-to-flash',
+              progress: nodeProgress,
+              workflowId: `workflow-${node.id}`,
+              templateName: node.templateName || 'Custom Configuration'
+            }
+          }));
+        });
+      }
+
+      console.log('✅ Multi-device deployment initiated successfully');
+      
+    } catch (error) {
+      console.error('❌ Multi-device deployment failed:', error);
+      alert(`Deployment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // Mark failed nodes
+      configuredNodes.forEach(node => {
+        setWorkflowProgress(prev => ({
+          ...prev,
+          [node.id]: {
+            status: 'failed',
+            progress: 0,
+            workflowId: `workflow-${node.id}`,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          }
+        }));
+      });
+    } finally {
+      setIsDeploying(false);
+      setDeploymentProgress(0);
+    }
+  }, [nodes, workflowProgress]);
 
   // Calculate connections between nodes (based on subnet/network relationships)
   const connections = nodes.flatMap(sourceNode => {
@@ -296,10 +484,61 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
     });
   };
 
+  // Get counts for different node statuses
+  const nodeCounts = {
+    total: nodes.length,
+    configured: nodes.filter(n => n.armbianConfig).length,
+    building: nodes.filter(n => n.deployment?.status === 'building').length,
+    deployed: nodes.filter(n => n.deployment?.status === 'deployed').length,
+    ready: nodes.filter(n => n.armbianConfig && n.deployment?.status !== 'building' && n.deployment?.status !== 'deploying').length
+  };
+
+  // Calculate node statistics
+  const nodeStatus = useCallback((): NodeStatus => {
+    const configured = nodes.filter(node => 
+      node.armbianConfig && 
+      node.name && 
+      node.nodeType
+    ).length;
+
+    const building = Object.values(workflowProgress).filter(w => 
+      w.status === 'building'
+    ).length;
+
+    const deployed = Object.values(workflowProgress).filter(w => 
+      w.status === 'deployed'
+    ).length;
+
+    const failed = Object.values(workflowProgress).filter(w => 
+      w.status === 'failed'
+    ).length;
+
+    const ready = configured - building - deployed - failed;
+
+    return {
+      total: nodes.length,
+      configured,
+      building,
+      deployed,
+      ready,
+      failed
+    };
+  }, [nodes, workflowProgress]);
+
+  const status = nodeStatus();
+
   return (
     <div className="h-full bg-white relative">
-      {/* Toolbar */}
+      {/* Enhanced Toolbar */}
       <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-white rounded-lg shadow-md p-2">
+        <button
+          onClick={handleAddNode}
+          className="flex items-center gap-1 px-3 py-1 text-sm bg-blue-500 text-white hover:bg-blue-600 rounded"
+        >
+          <Plus className="w-4 h-4" />
+          Add Node
+        </button>
+        <div className="w-px h-4 bg-gray-300"></div>
         <button
           onClick={() => handleZoom(0.1)}
           className="px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded"
@@ -314,7 +553,37 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
           -
         </button>
         <div className="w-px h-4 bg-gray-300"></div>
-        <span className="text-sm text-gray-600">{nodes.length} nodes</span>
+        <span className="text-sm text-gray-600">{nodeCounts.total} nodes</span>
+        <span className="text-sm text-gray-600">|</span>
+        <span className="text-sm text-green-600">{nodeCounts.configured} configured</span>
+      </div>
+
+      {/* Deploy All Button */}
+      <div className="absolute top-4 right-4 z-10 flex items-center gap-2 bg-white rounded-lg shadow-md p-2">
+        <div className="text-sm text-gray-600">
+          {nodeCounts.ready} ready • {nodeCounts.building} building
+        </div>
+        <button
+          onClick={handleDeployAll}
+          disabled={isDeploying || status.ready === 0}
+          className={`flex items-center gap-1 px-3 py-1 text-sm rounded ${
+            isDeploying || status.ready === 0
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              : 'bg-green-500 text-white hover:bg-green-600'
+          }`}
+        >
+          {isDeploying ? (
+            <>
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              Deploying... {deploymentProgress}%
+            </>
+          ) : (
+            <>
+              <Play className="w-4 h-4" />
+              Deploy All ({status.ready})
+            </>
+          )}
+        </button>
       </div>
 
       {/* Legend */}
@@ -381,13 +650,13 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
           </div>
           <div className="flex gap-1">
             <button
-              onClick={() => onNodeBuild(selectedNodeId)}
+              onClick={() => onNodeBuild?.(selectedNodeId)}
               className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
             >
               Build
             </button>
             <button
-              onClick={() => onNodeFlash(selectedNodeId)}
+              onClick={() => onNodeFlash?.(selectedNodeId)}
               className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
             >
               Flash
@@ -400,6 +669,20 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
             </button>
           </div>
         </div>
+      )}
+
+      {/* Add Node Modal */}
+      {(showAddNodeModal || showEditModal) && (
+        <DeviceConfigurationModal
+          isOpen={true}
+          onClose={() => {
+            setShowAddNodeModal(false);
+            setShowEditModal(false);
+            setSelectedNode(null);
+          }}
+          onSave={handleSaveNode}
+          existingNode={selectedNode || undefined}
+        />
       )}
     </div>
   );

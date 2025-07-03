@@ -8,6 +8,20 @@ export interface NetworkNode {
   nodeType: 'sbc' | 'workstation' | 'server' | 'appliance' | 'iot' | 'router' | 'switch' | 'nas' | 'gateway';
   deviceCategory: 'armbian_supported' | 'generic_linux' | 'proprietary' | 'embedded' | 'virtual';
   
+  // Template reference - NEW FIELDS
+  templateId?: string;
+  templateName?: string;
+  templateVersion?: string;
+  templateAuthor?: string;
+  builtFromTemplate?: {
+    id: string;
+    name: string;
+    version: string;
+    author: string;
+    buildDate: string;
+    checksum?: string;
+  };
+  
   location?: {
     room?: string;
     rack?: string;
@@ -310,10 +324,13 @@ export interface NodeCardProps {
 
 export interface NetworkTopologyViewProps {
   nodes: NetworkNode[];
-  onNodeSelect: (node: NetworkNode | null) => void;
-  onNodeUpdate: (nodeId: string, updates: Partial<NetworkNode>) => void;
-  onNodeBuild: (nodeId: string) => void;
-  onNodeFlash: (nodeId: string) => void;
+  onAddNode: (node: Partial<NetworkNode>) => void;
+  onUpdateNode: (nodeId: string, updates: Partial<NetworkNode>) => void;
+  onDeleteNode: (nodeId: string) => void;
+  className?: string;
+  onNodeSelect?: (node: NetworkNode | null) => void;
+  onNodeBuild?: (nodeId: string) => void;
+  onNodeFlash?: (nodeId: string) => void;
 }
 
 export interface DeviceTemplateSelectorProps {
